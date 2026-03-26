@@ -2,12 +2,16 @@ import { NextResponse } from "next/server";
 import { createClient } from "@supabase/supabase-js";
 import { Resend } from "resend";
 
-const supabase = createClient(
-  process.env.NEXT_PUBLIC_SUPABASE_URL!,
-  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
-);
+function getSupabase() {
+  return createClient(
+    process.env.NEXT_PUBLIC_SUPABASE_URL!,
+    process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+  );
+}
 
-const resend = new Resend(process.env.RESEND_API_KEY);
+function getResend() {
+  return new Resend(process.env.RESEND_API_KEY);
+}
 
 export async function POST(req: Request) {
   try {
@@ -21,7 +25,7 @@ export async function POST(req: Request) {
 
     // STEP 2: Verify the code they entered
     if (verifyCode) {
-      const { data: record } = await supabase
+      const { data: record } = await getSupabase()
         .from("promo_emails")
         .select("verify_code, redeemed, promo_code")
         .eq("email", normalizedEmail)
@@ -40,7 +44,7 @@ export async function POST(req: Request) {
       }
 
       // Mark as verified
-      await supabase
+      await getSupabase()
         .from("promo_emails")
         .update({ verified: true })
         .eq("email", normalizedEmail);
@@ -54,7 +58,7 @@ export async function POST(req: Request) {
     }
 
     // STEP 1: Send verification code + promo code to email
-    const { data: existing } = await supabase
+    const { data: existing } = await getSupabase()
       .from("promo_emails")
       .select("redeemed")
       .eq("email", normalizedEmail)
@@ -73,7 +77,7 @@ export async function POST(req: Request) {
     for (let i = 0; i < 6; i++) promoCode += chars[Math.floor(Math.random() * chars.length)];
 
     // Upsert email with both codes
-    await supabase
+    await getSupabase()
       .from("promo_emails")
       .upsert([{
         email: normalizedEmail,
@@ -87,7 +91,7 @@ export async function POST(req: Request) {
     const builderLink = `${baseUrl}/builder?promo=${promoCode}`;
 
     // Send email with verification code + promo code + builder link
-    await resend.emails.send({
+    await getResend().emails.send({
       from: "BobbleMe! <noreply@bobbleme.app>",
       to: normalizedEmail,
       subject: "🎁 Your FREE BobbleMe! Code Inside",
