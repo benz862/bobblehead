@@ -54,14 +54,14 @@ export default async function GalleryPage() {
             <h2 className="text-xl font-bold text-center mb-6 text-muted-foreground">⭐ Featured Creations</h2>
             <div className="columns-2 md:columns-4 gap-4 space-y-4">
               {[
-                { src: '/samples/demo-1.png', name: 'The MVP', style: 'Sports' },
-                { src: '/samples/demo-2.png', name: 'All-Star', style: 'Sports' },
-                { src: '/samples/demo-3.png', name: 'Game Day', style: 'Sports' },
-                { src: '/samples/demo-4.png', name: 'The Rookie', style: 'Sports' },
-                { src: '/samples/demo-5.png', name: 'Top Chef', style: 'Occupation' },
-                { src: '/samples/demo-6.png', name: 'Dr. Cool', style: 'Occupation' },
-                { src: '/samples/demo-7.png', name: 'Good Boy', style: 'Pet' },
-                { src: '/samples/demo-8.png', name: 'Whiskers', style: 'Pet' },
+                { src: '/samples/demo-1.png', name: 'Queen Merida', style: 'Pet' },
+                { src: '/samples/demo-2.png', name: 'LCol. Williams', style: 'Occupation' },
+                { src: '/samples/demo-3.png', name: 'Sandra #23', style: 'Sport' },
+                { src: '/samples/demo-4.png', name: 'Capt. Bergen', style: 'Occupation' },
+                { src: '/samples/demo-5.png', name: 'Janice', style: 'Sport' },
+                { src: '/samples/demo-6.png', name: 'Farmer John', style: 'Occupation' },
+                { src: '/samples/demo-7.png', name: 'The Cleaner', style: 'Occupation' },
+                { src: '/samples/demo-8.png', name: 'Björn #73', style: 'Sport' },
               ].map((item, i) => (
                 <div
                   key={`showcase-${i}`}
