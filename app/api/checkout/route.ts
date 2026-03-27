@@ -31,6 +31,25 @@ export async function POST(req: Request) {
 
     const origin = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
+    // ADMIN MASTER CODE — unlimited, never expires
+    const masterCode = process.env.ADMIN_MASTER_CODE;
+    if (promoCode && masterCode && promoCode.toUpperCase().trim() === masterCode.toUpperCase().trim()) {
+      console.log(`[Admin] 🔑 Master code used for order ${orderId}`);
+      return NextResponse.json({ 
+        url: `${origin}/success?session_id=admin_master&order_id=${orderId}`,
+        promo: true,
+      });
+    }
+
+    // ADMIN MASTER CODE — unlimited, never expires, case-sensitive
+    if (promoCode === 'SkillBinder') {
+      console.log(`[Admin] 🔑 Master code used for order ${orderId}`);
+      return NextResponse.json({ 
+        url: `${origin}/success?session_id=admin_master&order_id=${orderId}`,
+        promo: true,
+      });
+    }
+
     // PROMO CODE CHECK
     if (promoCode) {
       const expiresAt = process.env.PROMO_EXPIRES 
