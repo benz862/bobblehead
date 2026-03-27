@@ -103,30 +103,84 @@ export default function ResumePage() {
           )}
 
           {orders !== null && orders.length > 0 && (
-            <div className="space-y-3">
-              <h2 className="font-bold text-lg">Your Active Orders</h2>
-              {orders.map((order) => (
-                <Link
-                  key={order.id}
-                  href={`/builder?order_id=${order.id}&tier=${order.tier}`}
-                  className="block p-5 rounded-xl border bg-white hover:shadow-lg hover:border-purple-300 transition-all duration-200 text-left group"
-                >
-                  <div className="flex items-center justify-between">
-                    <div>
-                      <p className="font-bold text-purple-700">{tierLabel(order.tier)} Pack</p>
-                      <p className="text-sm text-muted-foreground mt-1">
-                        {order.credits_used} of {order.credits_total} used — <span className="font-bold text-pink-600">{order.credits_total - order.credits_used} remaining</span>
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1">
-                        Ordered {new Date(order.created_at).toLocaleDateString()}
-                      </p>
+            <div className="space-y-6 text-left">
+              {/* Orders with remaining credits */}
+              {orders.filter(o => o.credits_used < o.credits_total).length > 0 && (
+                <>
+                  <h2 className="font-bold text-lg text-center">🎨 Active Orders</h2>
+                  {orders.filter(o => o.credits_used < o.credits_total).map((order) => (
+                    <div key={order.id} className="p-5 rounded-xl border bg-white shadow-sm space-y-3">
+                      <div className="flex items-center justify-between">
+                        <div>
+                          <p className="font-bold text-purple-700">{tierLabel(order.tier)} Pack</p>
+                          <p className="text-sm text-muted-foreground mt-1">
+                            {order.credits_used} of {order.credits_total} used — <span className="font-bold text-pink-600">{order.credits_total - order.credits_used} remaining</span>
+                          </p>
+                          <p className="text-xs text-muted-foreground mt-1">
+                            Ordered {new Date(order.created_at).toLocaleDateString()}
+                          </p>
+                        </div>
+                        <Link
+                          href={`/builder?order_id=${order.id}&tier=${order.tier}`}
+                          className="px-4 h-10 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-medium text-sm hover:from-purple-700 hover:to-pink-600 transition-all duration-200 hover:scale-105 shadow-md gap-1.5"
+                        >
+                          Continue <ArrowRight className="h-3.5 w-3.5" />
+                        </Link>
+                      </div>
+                      {/* Past creations for this order */}
+                      {order.completedImages && order.completedImages.length > 0 && (
+                        <div className="pt-3 border-t">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Your creations so far:</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {order.completedImages.map((url: string, i: number) => (
+                              <div key={i} className="relative w-20 h-24 rounded-lg overflow-hidden border shadow-sm" onContextMenu={(e) => e.preventDefault()}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={url} alt={`Creation ${i + 1}`} className="w-full h-full object-cover pointer-events-none select-none" draggable={false} />
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none bg-black/5">
+                                  <p className="text-[8px] font-black text-white/40 rotate-[-30deg] tracking-widest">PREVIEW</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                    <div className="text-purple-500 group-hover:translate-x-1 transition-transform">
-                      <ArrowRight className="h-5 w-5" />
+                  ))}
+                </>
+              )}
+
+              {/* Fully used orders — show past creations only */}
+              {orders.filter(o => o.credits_used >= o.credits_total).length > 0 && (
+                <>
+                  <h2 className="font-bold text-lg text-center mt-4">✅ Completed Orders</h2>
+                  {orders.filter(o => o.credits_used >= o.credits_total).map((order) => (
+                    <div key={order.id} className="p-5 rounded-xl border bg-muted/20 space-y-3">
+                      <div>
+                        <p className="font-bold text-muted-foreground">{tierLabel(order.tier)} Pack — <span className="text-green-600">All {order.credits_total} used</span></p>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          Ordered {new Date(order.created_at).toLocaleDateString()}
+                        </p>
+                      </div>
+                      {order.completedImages && order.completedImages.length > 0 && (
+                        <div className="pt-3 border-t">
+                          <p className="text-xs font-medium text-muted-foreground mb-2">Your creations:</p>
+                          <div className="flex gap-2 flex-wrap">
+                            {order.completedImages.map((url: string, i: number) => (
+                              <div key={i} className="relative w-20 h-24 rounded-lg overflow-hidden border shadow-sm" onContextMenu={(e) => e.preventDefault()}>
+                                {/* eslint-disable-next-line @next/next/no-img-element */}
+                                <img src={url} alt={`Creation ${i + 1}`} className="w-full h-full object-cover pointer-events-none select-none" draggable={false} />
+                                <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none bg-black/5">
+                                  <p className="text-[8px] font-black text-white/40 rotate-[-30deg] tracking-widest">PREVIEW</p>
+                                </div>
+                              </div>
+                            ))}
+                          </div>
+                        </div>
+                      )}
                     </div>
-                  </div>
-                </Link>
-              ))}
+                  ))}
+                </>
+              )}
             </div>
           )}
         </div>

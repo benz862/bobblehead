@@ -14,7 +14,7 @@ export async function POST(req: Request) {
       process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
     );
 
-    // Find orders with remaining credits for this email
+    // Find orders for this email
     const { data: orders, error } = await supabase
       .from("orders")
       .select("id, tier, credits_total, credits_used, created_at")
@@ -26,10 +26,26 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Failed to look up orders" }, { status: 500 });
     }
 
-    // Filter to only orders with remaining credits
-    const activeOrders = (orders || []).filter(o => o.credits_used < o.credits_total);
+    // For each order, fetch completed generation images
+    const ordersWithImages = await Promise.all(
+      (orders || []).map(async (order) => {
+        const { data: generations } = await supabase
+          .from("generations")
+          .select("output_image_url")
+          .eq("order_id", order.id)
+          .eq("status", "completed")
+          .order("created_at", { ascending: true });
 
-    return NextResponse.json({ orders: activeOrders });
+        return {
+          ...order,
+          completedImages: (generations || [])
+            .map((g: any) => g.output_image_url)
+            .filter(Boolean),
+        };
+      })
+    );
+
+    return NextResponse.json({ orders: ordersWithImages });
   } catch (err: any) {
     console.error("Resume API Error:", err);
     return NextResponse.json({ error: err.message }, { status: 500 });
