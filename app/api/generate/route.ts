@@ -46,6 +46,7 @@ export async function POST(req: Request) {
     let hairColor = '';
     let facialHair = '';
     let petDescription = '';
+    let identitySignature = '';
     const isPet = config.theme_type === 'pet';
     
     if (uploads && uploads.length > 0) {
@@ -83,29 +84,32 @@ You MUST describe ALL of the following:
 IMPORTANT: Output your response in TWO parts:
 1. First line must be exactly: FUR COLOR: [the precise fur/coat color, e.g. "rich golden blonde" or "black and tan" or "orange tabby with white patches"]
 2. Second part: a single dense paragraph with the full animal description. Be brutally precise.`
-                  : `You are a forensic facial description specialist. Analyze this photo and produce an extremely detailed physical description of the person's head and face. Your description will be used to recreate their likeness, so accuracy is critical.
+                  : `You are a forensic facial description specialist creating a description that will be used to recreate this person's likeness as a figurine. ACCURACY OF LIKENESS IS THE #1 PRIORITY.
+
+Analyze this photo and produce an extremely detailed physical description. Focus on what makes THIS person's face UNIQUE and RECOGNIZABLE — the features that distinguish them from anyone else.
 
 You MUST describe ALL of the following in precise detail:
 1. GENDER and approximate AGE
 2. ETHNICITY and exact SKIN TONE (use specific descriptors like "warm medium-brown", "fair with pink undertones", "deep ebony", "olive-toned")
-3. FACE SHAPE (oval, round, square, heart, oblong, diamond)
+3. FACE SHAPE (oval, round, square, heart, oblong, diamond) and FACE PROPORTIONS (wide vs narrow, long vs short)
 4. FOREHEAD (high, low, broad, narrow)
-5. EYES: exact color, shape (almond, round, hooded, deep-set, wide-set), size, eyebrow shape/thickness/color
-6. NOSE: size, shape (broad, narrow, upturned, aquiline, button), bridge width
-7. MOUTH and LIPS: lip fullness (thin, medium, full), lip color, smile characteristics
-8. CHIN and JAW: shape (pointed, square, rounded), jaw width, chin prominence
-9. CHEEKBONES: prominent/flat, high/low
-10. HAIR: exact color (use specific shades like "dark chestnut brown", "platinum blonde", "jet black", "honey blonde", "auburn", "strawberry blonde", "salt-and-pepper gray"), texture (straight, wavy, curly, coily, kinky), length, style, part, hairline shape. If balding or thinning, describe exactly where.
-11. EARS: visible? Size, shape
-12. ACCESSORIES: glasses (frame shape/color), earrings, piercings, notable jewelry
-13. DISTINGUISHING FEATURES: dimples, moles, scars, wrinkles, freckles, laugh lines
+5. EYES: exact color, shape (almond, round, hooded, deep-set, wide-set, close-set), size relative to face, eyebrow shape/thickness/color/arch, distance between eyes
+6. NOSE: size relative to face, shape (broad, narrow, upturned, aquiline, button, Roman), bridge width, tip shape, nostril prominence
+7. MOUTH and LIPS: lip fullness (thin, medium, full), upper vs lower lip ratio, lip color, width of mouth, smile characteristics (does the smile show teeth? dimples?)
+8. CHIN and JAW: shape (pointed, square, rounded, cleft), jaw width relative to forehead, jawline definition
+9. CHEEKBONES: prominent/flat, high/low, cheek fullness
+10. HAIR: exact color (use specific shades like "dark chestnut brown", "platinum blonde", "jet black", "honey blonde", "auburn", "salt-and-pepper gray"), texture (straight, wavy, curly, coily, kinky), length, style, part side, hairline shape (receding? widow's peak?). If balding or thinning, describe exactly where and how much.
+11. EARS: size, shape, how much they protrude
+12. ACCESSORIES: glasses (frame shape/color/style), earrings, piercings
+13. DISTINGUISHING FEATURES: dimples, moles (location and size), scars, wrinkles pattern, freckles, laugh lines, beauty marks, asymmetries
 
 ONLY mention facial hair if they actually have a beard, mustache, or goatee. If they have none, do NOT mention facial hair at all.
 
-IMPORTANT: Output your response in THREE parts:
-1. First line must be exactly: HAIR COLOR: [the precise hair color, e.g. "dark chestnut brown" or "jet black" or "light honey blonde"]
-2. Second line must be exactly: FACIAL HAIR: [describe any facial hair precisely, e.g. "full dark brown beard" or "neatly trimmed salt-and-pepper goatee" or "thin black mustache" or "none"]
-3. Third part: a single dense paragraph with the full description. Be brutally precise and objective.` },
+IMPORTANT: Output your response in FOUR parts:
+1. First line: HAIR COLOR: [the precise hair color]
+2. Second line: FACIAL HAIR: [describe any facial hair precisely, or "none"]
+3. Third line: IDENTITY SIGNATURE: [List the 5-7 MOST DISTINCTIVE features that make this person uniquely recognizable, in order of importance. These should be the features someone would use to pick this person out of a crowd. Format as a comma-separated list, e.g. "prominent aquiline nose, deep-set bright blue eyes, strong square jaw, thick dark eyebrows, cleft chin, salt-and-pepper wavy hair"]
+4. Fourth part: a single dense paragraph with the full description. Be brutally precise and objective.` },
                 { inlineData: { mimeType: "image/jpeg", data: base64Img } }
               ]
             }]
@@ -144,6 +148,12 @@ IMPORTANT: Output your response in THREE parts:
               facialHair = facialHairMatch[1].trim();
               console.log(`[AI Engine] Extracted Facial Hair: ${facialHair}`);
             }
+          }
+          // Extract identity signature
+          const idSigMatch = faceDescription.match(/IDENTITY SIGNATURE:\s*(.+)/i);
+          if (idSigMatch) {
+            identitySignature = idSigMatch[1].trim();
+            console.log(`[AI Engine] Identity Signature: ${identitySignature}`);
           }
         }
         // Vision API error handling moved inline above
@@ -235,6 +245,11 @@ IMPORTANT: Output your response in THREE parts:
       : (hairColor ? `\n\nCRITICAL - HAIR COLOR: The figure's hair MUST be ${hairColor}. This is the #1 priority for likeness accuracy. Do NOT change the hair color. The hair is ${hairColor}.` : '')
       + (facialHair ? `\n\nCRITICAL - FACIAL HAIR: The figure MUST have ${facialHair}. This is essential for likeness. Do NOT remove or omit the facial hair. The figure has ${facialHair}.` : '');
 
+    // Build identity reinforcement block for humans
+    const identityReinforcement = !isPet && identitySignature 
+      ? `\n\n🎯 IDENTITY SIGNATURE (MOST IMPORTANT — REPEAT FOR EMPHASIS):\nThe following features are the KEY IDENTIFIERS that make this person recognizable. These MUST be clearly visible and accurate in the final image:\n${identitySignature}\n\nREPEAT: The figure's face MUST show: ${identitySignature}. Getting these features right is MORE IMPORTANT than the outfit or pose.`
+      : '';
+
     let prompt: string;
 
     if (isPet) {
@@ -277,11 +292,11 @@ OUTFIT AND PROPS (MANDATORY):
 The figure is ${propsDescription}. ${outfitDescription}
 Do NOT substitute with a business suit, casual clothes, or any other outfit. The figure has an energetic pose while feet stay on the base.
 
-HEAD AND FACE (PHOTOREALISTIC):
-The head and face should look much more realistic than the body — like a high-quality portrait photograph. Real skin texture with visible pores and natural tonal variation. Real hair with individual strands, shine, and movement${hairColor ? ` — hair color ${hairColor}` : ''}.${facialHair ? ` IMPORTANT: This person has ${facialHair}. The facial hair MUST be visible on the figurine. Do NOT omit the facial hair.` : ''} Realistic eyes with wet reflections, iris detail, and depth. The head should contrast with the glossy plastic toy body.
+HEAD AND FACE (PHOTOREALISTIC — LIKENESS IS THE #1 PRIORITY):
+The head and face should look much more realistic than the body — like a high-quality portrait photograph of a SPECIFIC REAL PERSON. The face must be INSTANTLY RECOGNIZABLE as the person described below. Real skin texture with visible pores and natural tonal variation. Real hair with individual strands, shine, and movement${hairColor ? ` — hair color is ${hairColor}` : ''}.${facialHair ? ` IMPORTANT: This person has ${facialHair}. The facial hair MUST be visible on the figurine. Do NOT omit the facial hair.` : ''} Realistic eyes with wet reflections, iris detail, and depth. The head should contrast with the glossy plastic toy body.
 
-FACE IDENTITY (MATCH THIS):
-${faceDescription.replace(/\n/g, ' ')}${colorEmphasis}
+FACE IDENTITY (MATCH THIS PERSON EXACTLY — THIS IS THE MOST IMPORTANT SECTION):
+${faceDescription.replace(/\n/g, ' ')}${colorEmphasis}${identityReinforcement}
 
 BODY AND PROPORTIONS:
 - Classic bobblehead proportions: MASSIVE oversized head, tiny cartoonish body
