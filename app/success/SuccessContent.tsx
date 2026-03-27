@@ -25,6 +25,8 @@ export default function SuccessContent() {
   const [zoomedIndex, setZoomedIndex] = useState<number | null>(null);
   const [copied, setCopied] = useState(false);
   const [showGalleryOpt, setShowGalleryOpt] = useState(false);
+  const [creditsTotal, setCreditsTotal] = useState(1);
+  const [creditsUsed, setCreditsUsed] = useState(0);
 
   const processOrder = useCallback(async () => {
     if (!orderId) {
@@ -96,6 +98,8 @@ export default function SuccessContent() {
       if (data.error) throw new Error(data.error);
       if (data.imageUrl) {
         setFinalImageUrl(data.imageUrl);
+        if (data.creditsTotal) setCreditsTotal(data.creditsTotal);
+        if (data.creditsUsed) setCreditsUsed(data.creditsUsed);
         setStatus("complete");
         
         setTimeout(() => {
@@ -340,7 +344,26 @@ export default function SuccessContent() {
             <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
               <CheckCircle2 className="h-16 w-16 text-green-500 mb-4" />
               <h1 className="text-3xl font-bold bg-gradient-to-r from-purple-600 to-pink-500 bg-clip-text text-transparent">Your Bobblehead is Ready! 🎉</h1>
-              <p className="text-muted-foreground mt-2 mb-8">Your download should start automatically. If not, smash that download button below!</p>
+              <p className="text-muted-foreground mt-2 mb-4">Your download should start automatically. If not, smash that download button below!</p>
+              
+              {/* Credit Counter */}
+              {creditsTotal > 1 && (
+                <div className="mb-6 px-6 py-3 rounded-full bg-gradient-to-r from-purple-100 to-pink-100 border border-purple-200 inline-flex items-center gap-2">
+                  {creditsUsed < creditsTotal ? (
+                    <>
+                      <span className="text-lg">🎯</span>
+                      <span className="font-bold text-purple-700">{creditsUsed} of {creditsTotal}</span>
+                      <span className="text-purple-600">bobbleheads created —</span>
+                      <span className="font-bold text-pink-600">{creditsTotal - creditsUsed} remaining!</span>
+                    </>
+                  ) : (
+                    <>
+                      <span className="text-lg">🎊</span>
+                      <span className="font-bold text-green-700">All {creditsTotal} bobbleheads created!</span>
+                    </>
+                  )}
+                </div>
+              )}
               
               <div className="relative group rounded-xl overflow-hidden shadow-2xl border bg-white dark:bg-zinc-900 p-2">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -358,9 +381,15 @@ export default function SuccessContent() {
                   <Download className="h-4 w-4" />
                   Download HD 📥
                 </a>
-                <Link href="/builder" className="px-6 h-12 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-medium hover:from-purple-700 hover:to-pink-600 transition-all duration-200 hover:scale-105 shadow-lg">
-                  🎨 Make Another!
-                </Link>
+                {creditsUsed < creditsTotal ? (
+                  <Link href={`/builder?order_id=${orderId}&tier=${creditsTotal}`} className="px-6 h-12 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-medium hover:from-purple-700 hover:to-pink-600 transition-all duration-200 hover:scale-105 shadow-lg">
+                    🎨 Make Another! ({creditsTotal - creditsUsed} left)
+                  </Link>
+                ) : (
+                  <Link href="/pricing" className="px-6 h-12 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-medium hover:from-purple-700 hover:to-pink-600 transition-all duration-200 hover:scale-105 shadow-lg">
+                    🎨 Buy More!
+                  </Link>
+                )}
               </div>
 
               {/* Share Section */}

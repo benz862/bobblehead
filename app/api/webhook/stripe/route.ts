@@ -36,10 +36,11 @@ export async function POST(req: Request) {
     const orderId = session.metadata?.orderId;
 
     if (orderId) {
-      // 1. Update the order status in Supabase
+      // 1. Update the order status and save customer email
+      const customerEmail = session.customer_details?.email || session.customer_email || null;
       const { error } = await supabase
         .from("orders")
-        .update({ status: "paid" })
+        .update({ status: "paid", customer_email: customerEmail })
         .eq("id", orderId);
 
       if (error) {

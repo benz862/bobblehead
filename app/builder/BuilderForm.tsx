@@ -1,6 +1,6 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SPORT_TEAMS, SPORT_ORIENTATIONS, SPORT_POSITIONS, SOCCER_LEAGUES, type Team } from "@/lib/teams";
@@ -25,6 +25,25 @@ export function BuilderForm() {
   const [images, setImages] = useState<File[]>([]);
   const [isProcessing, setIsProcessing] = useState(false);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+
+  // Credit reuse: when returning with an existing order_id
+  const existingOrderId = searchParams.get('order_id');
+  const [creditInfo, setCreditInfo] = useState<{ total: number; used: number } | null>(null);
+  const [existingUploads, setExistingUploads] = useState<string[]>([]);
+
+  useEffect(() => {
+    if (!existingOrderId) return;
+    (async () => {
+      const { data: order } = await supabase.from('orders').select('credits_total, credits_used, tier').eq('id', existingOrderId).single();
+      if (order) {
+        setCreditInfo({ total: order.credits_total, used: order.credits_used });
+      }
+      const { data: uploads } = await supabase.from('uploads').select('image_url').eq('order_id', existingOrderId);
+      if (uploads && uploads.length > 0) {
+        setExistingUploads(uploads.map((u: any) => u.image_url));
+      }
+    })();
+  }, [existingOrderId]);
   
   // Sport state
   const [sport, setSport] = useState("");
@@ -106,10 +125,54 @@ export function BuilderForm() {
     try {
       setIsProcessing(true);
       setErrorMessage(null);
+
+      // If returning to use a credit, reuse the existing order
+      if (existingOrderId && creditInfo && creditInfo.used < creditInfo.total) {
+        const orderId = existingOrderId;
+
+        // Upload photos if user provided new ones; otherwise reuse existing
+        let uploadedUrls = existingUploads;
+        if (images.length > 0) {
+          uploadedUrls = [];
+          for (let i = 0; i < images.length; i++) {
+            const file = images[i];
+            const fileExt = file.name.split('.').pop();
+            const fileName = `${orderId}-credit${creditInfo.used + 1}-${i}-${Date.now()}.${fileExt}`;
+            const { error: uploadError } = await supabase.storage.from('user-uploads').upload(fileName, file);
+            if (uploadError) throw uploadError;
+            const { data: publicUrlData } = supabase.storage.from('user-uploads').getPublicUrl(fileName);
+            uploadedUrls.push(publicUrlData.publicUrl);
+          }
+          // Insert new upload records
+          const uploadInserts = uploadedUrls.map(url => ({ order_id: parseInt(orderId), image_url: url }));
+          await supabase.from('uploads').insert(uploadInserts);
+        }
+
+        const finalOccupation = occupation === 'custom' ? customOccupation : occupation;
+        const finalTeamName = isCustomTeam ? customTeamName : (selectedTeam?.name || '');
+        const themeDetails = {
+          sport, teamName: finalTeamName, teamColors, jersey, position, orientations, sportCustomDetails,
+          occupation: finalOccupation, customProps,
+          animalType: animalType === 'custom' ? petBreed : animalType, petBreed, petCostume,
+        };
+
+        // Create a new generation row for this credit use
+        await supabase.from('generations').insert([{
+          order_id: parseInt(orderId),
+          theme_type: themeType,
+          theme_details: themeDetails,
+          nameplate: nameplate,
+          status: 'pending'
+        }]);
+
+        // Skip payment — go straight to success
+        window.location.href = `/success?session_id=credit_reuse&order_id=${orderId}`;
+        return;
+      }
       
       const { data: order, error } = await supabase
         .from('orders')
-        .insert([{ tier, amount: price, status: 'pending' }])
+        .insert([{ tier, amount: price, status: 'pending', credits_total: tier, credits_used: 0 }])
         .select()
         .single();
         
@@ -212,12 +275,21 @@ export function BuilderForm() {
       <div>
         <h2 className="text-2xl font-bold mb-1">🎨 Build Your Bobblehead</h2>
         <p className="text-sm text-muted-foreground">Pick your look, upload your face, and let the magic happen!</p>
-        <div className="mt-3 inline-flex items-center gap-2 bg-purple-100 text-purple-800 font-bold text-sm px-4 py-2 rounded-full">
-          <span>{tierEmoji}</span>
-          <span>{tierLabel} — {tier} {tier === 1 ? 'bobblehead' : 'bobbleheads'}</span>
-          <span className="text-purple-500">|</span>
-          <span>${(price / 100).toFixed(2)}</span>
-        </div>
+        {existingOrderId && creditInfo ? (
+          <div className="mt-3 inline-flex items-center gap-2 bg-green-100 text-green-800 font-bold text-sm px-4 py-2 rounded-full">
+            <span>🎯</span>
+            <span>Credit {creditInfo.used + 1} of {creditInfo.total}</span>
+            <span className="text-green-500">|</span>
+            <span className="text-green-600">{creditInfo.total - creditInfo.used} remaining — FREE</span>
+          </div>
+        ) : (
+          <div className="mt-3 inline-flex items-center gap-2 bg-purple-100 text-purple-800 font-bold text-sm px-4 py-2 rounded-full">
+            <span>{tierEmoji}</span>
+            <span>{tierLabel} — {tier} {tier === 1 ? 'bobblehead' : 'bobbleheads'}</span>
+            <span className="text-purple-500">|</span>
+            <span>${(price / 100).toFixed(2)}</span>
+          </div>
+        )}
       </div>
 
       {/* Stepper Progress */}
@@ -586,13 +658,18 @@ export function BuilderForm() {
         {/* Checkout */}
         <button 
           onClick={handleCheckout}
-          disabled={images.length === 0 || !themeType || isProcessing}
+          disabled={(images.length === 0 && existingUploads.length === 0) || !themeType || isProcessing}
           className="w-full inline-flex items-center justify-center gap-2 rounded-full text-sm font-bold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:from-purple-700 hover:to-pink-600 hover:shadow-xl hover:scale-[1.02] h-14 px-8"
         >
           {isProcessing ? (
             <>
               <Loader2 className="h-4 w-4 animate-spin" />
               Creating Magic...
+            </>
+          ) : existingOrderId && creditInfo ? (
+            <>
+              <Gift className="h-4 w-4" />
+              ✨ Generate — Free!
             </>
           ) : promoCode ? (
             <>
@@ -606,7 +683,7 @@ export function BuilderForm() {
             </>
           )}
         </button>
-        {images.length === 0 && (
+        {images.length === 0 && existingUploads.length === 0 && (
           <p className="text-xs text-destructive mt-2 text-center">Please upload at least 1 photo to continue.</p>
         )}
       </div>

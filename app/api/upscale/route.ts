@@ -38,16 +38,27 @@ export async function POST(req: Request) {
       
     const finalUrl = publicUrlData.publicUrl;
 
-    // Update DB
+    // Update the latest generation row for this order (the one in 'previewing' state)
     await supabase.from('generations').update({ 
       output_image_url: finalUrl,
       status: 'completed'
-    }).eq('order_id', orderId);
+    }).eq('order_id', orderId).eq('status', 'previewing');
 
-    console.log(`[Upscale] ✅ Complete! Final 2K image: ${finalUrl}`);
-    return NextResponse.json({ success: true, imageUrl: finalUrl });
+    // Increment credits_used on the order
+    const { data: order } = await supabase.from('orders').select('credits_total, credits_used').eq('id', orderId).single();
+    const newUsed = (order?.credits_used || 0) + 1;
+    await supabase.from('orders').update({ credits_used: newUsed }).eq('id', orderId);
+
+    console.log(`[Upscale] ✅ Complete! Credit ${newUsed}/${order?.credits_total}. Final 2K image: ${finalUrl}`);
+    return NextResponse.json({ 
+      success: true, 
+      imageUrl: finalUrl,
+      creditsTotal: order?.credits_total || 1,
+      creditsUsed: newUsed,
+    });
   } catch (error: any) {
     console.error("Upscale API Error:", error);
     return NextResponse.json({ error: error.message || "Failed to upscale image" }, { status: 500 });
   }
 }
+

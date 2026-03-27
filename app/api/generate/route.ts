@@ -20,13 +20,18 @@ export async function POST(req: Request) {
       throw new Error("Order not found or database error");
     }
 
+    // Credit check: ensure order has remaining credits
+    if (order.credits_used >= order.credits_total) {
+      return NextResponse.json({ error: "All credits for this order have been used." }, { status: 400 });
+    }
+
     // Uncomment this in production to prevent free generations!
     // if (order.status !== 'paid') {
     //   return NextResponse.json({ error: "Order payment not verified" }, { status: 400 });
     // }
 
-    // 2. Fetch config and images
-    const { data: config } = await supabase.from('generations').select('*').eq('order_id', orderId).single();
+    // 2. Fetch config and images — get the LATEST pending generation for this order
+    const { data: config } = await supabase.from('generations').select('*').eq('order_id', orderId).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).single();
     const { data: uploads } = await supabase.from('uploads').select('*').eq('order_id', orderId);
 
     if (!config || !uploads || uploads.length === 0) {

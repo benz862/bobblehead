@@ -7,6 +7,9 @@ CREATE TABLE IF NOT EXISTS public.orders (
     tier INT NOT NULL,
     amount INT NOT NULL,
     status TEXT NOT NULL DEFAULT 'pending',
+    credits_total INT NOT NULL DEFAULT 1,
+    credits_used INT NOT NULL DEFAULT 0,
+    customer_email TEXT,
     created_at TIMESTAMP WITH TIME ZONE DEFAULT timezone('utc'::text, now()) NOT NULL
 );
 
