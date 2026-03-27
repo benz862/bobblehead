@@ -132,6 +132,7 @@ export default function Home() {
             { q: "Can I make a non-sports bobblehead?", a: "Absolutely! Choose from preset occupations (doctor, firefighter, chef, astronaut...) or type any custom character you can imagine — like a pirate captain, disco dancer, or superhero." },
             { q: "How long does it take?", a: "The AI generates your 4 bobblehead previews in about 30-60 seconds. Upscaling your selected favorite takes another 15-30 seconds." },
             { q: "What photo works best?", a: "A clear, front-facing photo with good lighting. The AI analyzes your facial features in detail, so the clearer the photo, the better the likeness!" },
+            { q: "I bought a multi-pack but closed my browser. How do I get my remaining bobbleheads?", a: "No worries! Visit our Resume Order page and enter the email you used at checkout. We'll find your order and let you continue creating your remaining bobbleheads for free." },
           ].map((item, i) => (
             <details key={i} className="group border rounded-xl bg-white/80 backdrop-blur-sm shadow-sm hover:shadow-md transition-shadow">
               <summary className="flex items-center justify-between p-5 cursor-pointer font-semibold text-sm">
@@ -170,6 +171,7 @@ export default function Home() {
           <div className="flex items-center gap-6 text-sm text-muted-foreground">
             <Link href="/pricing" className="hover:text-foreground transition-colors">Pricing</Link>
             <Link href="/gallery" className="hover:text-foreground transition-colors">Gallery</Link>
+            <Link href="/resume" className="hover:text-foreground transition-colors">Resume Order</Link>
           </div>
           <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} BobbleMe! — AI-Powered Bobbleheads</p>
         </div>
