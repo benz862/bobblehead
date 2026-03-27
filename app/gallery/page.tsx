@@ -55,13 +55,13 @@ export default async function GalleryPage() {
             <div className="columns-2 md:columns-4 gap-4 space-y-4">
               {[
                 { src: '/samples/demo-1.png', name: 'Queen Merida', style: 'Pet' },
-                { src: '/samples/demo-2.png', name: 'LCol. Williams', style: 'Occupation' },
-                { src: '/samples/demo-3.png', name: 'Sandra #23', style: 'Sport' },
-                { src: '/samples/demo-4.png', name: 'Capt. Bergen', style: 'Occupation' },
-                { src: '/samples/demo-5.png', name: 'Janice', style: 'Sport' },
-                { src: '/samples/demo-6.png', name: 'Farmer John', style: 'Occupation' },
-                { src: '/samples/demo-7.png', name: 'The Cleaner', style: 'Occupation' },
-                { src: '/samples/demo-8.png', name: 'Björn #73', style: 'Sport' },
+                { src: '/samples/demo-2.png', name: 'Janice', style: 'Sport' },
+                { src: '/samples/demo-3.png', name: 'LCol. Williams', style: 'Occupation' },
+                { src: '/samples/demo-4.png', name: 'Farmer John', style: 'Occupation' },
+                { src: '/samples/demo-5.png', name: 'Sandra #23', style: 'Sport' },
+                { src: '/samples/demo-6.png', name: 'The Cleaner', style: 'Occupation' },
+                { src: '/samples/demo-7.png', name: 'Capt. Bergen - A380', style: 'Occupation' },
+                { src: '/samples/demo-8.png', name: 'Bjorn Thorgood #73', style: 'Sport' },
               ].map((item, i) => (
                 <div
                   key={`showcase-${i}`}
