@@ -173,7 +173,7 @@ export default function Home() {
             <Link href="/gallery" className="hover:text-foreground transition-colors">Gallery</Link>
             <Link href="/resume" className="hover:text-foreground transition-colors">Resume Order</Link>
           </div>
-          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} BobbleMe! — AI-Powered Bobbleheads</p>
+          <p className="text-xs text-muted-foreground">© {new Date().getFullYear()} BobbleMe! — AI-Powered Bobbleheads by EpoxyDogs LLC.</p>
         </div>
       </footer>
     </main>
