@@ -32,7 +32,19 @@ export async function POST(req: Request) {
 
     // 2. Fetch config and images — get the LATEST pending generation for this order
     const { data: config } = await supabase.from('generations').select('*').eq('order_id', orderId).eq('status', 'pending').order('created_at', { ascending: false }).limit(1).single();
-    const { data: uploads } = await supabase.from('uploads').select('*').eq('order_id', orderId);
+    
+    // If this generation has specific uploadIds (credit reuse with new photos), use only those
+    // Otherwise fall back to all uploads for the order (first-time generation)
+    const generationUploadIds = config?.theme_details?.uploadIds;
+    let uploads;
+    if (generationUploadIds && generationUploadIds.length > 0) {
+      console.log(`[AI Engine] Using generation-specific uploads: ${generationUploadIds.join(', ')}`);
+      const { data } = await supabase.from('uploads').select('*').in('id', generationUploadIds);
+      uploads = data;
+    } else {
+      const { data } = await supabase.from('uploads').select('*').eq('order_id', orderId);
+      uploads = data;
+    }
 
     if (!config || !uploads || uploads.length === 0) {
       throw new Error("Missing generation configuration or source images");

@@ -130,7 +130,8 @@ export function BuilderForm() {
       if (existingOrderId && creditInfo && creditInfo.used < creditInfo.total) {
         const orderId = existingOrderId;
 
-        // Upload photos if user provided new ones; otherwise reuse existing
+        // Upload NEW photos for this generation (credit reuse)
+        let newUploadIds: number[] = [];
         let uploadedUrls = existingUploads;
         if (images.length > 0) {
           uploadedUrls = [];
@@ -143,9 +144,12 @@ export function BuilderForm() {
             const { data: publicUrlData } = supabase.storage.from('user-uploads').getPublicUrl(fileName);
             uploadedUrls.push(publicUrlData.publicUrl);
           }
-          // Insert new upload records
+          // Insert new upload records and capture their IDs
           const uploadInserts = uploadedUrls.map(url => ({ order_id: parseInt(orderId), image_url: url }));
-          await supabase.from('uploads').insert(uploadInserts);
+          const { data: insertedUploads } = await supabase.from('uploads').insert(uploadInserts).select('id');
+          if (insertedUploads) {
+            newUploadIds = insertedUploads.map((u: any) => u.id);
+          }
         }
 
         const finalOccupation = occupation === 'custom' ? customOccupation : occupation;
@@ -154,6 +158,8 @@ export function BuilderForm() {
           sport, teamName: finalTeamName, teamColors, jersey, position, orientations, sportCustomDetails,
           occupation: finalOccupation, customProps,
           animalType: animalType === 'custom' ? petBreed : animalType, petBreed, petCostume,
+          // Tag this generation with the specific upload IDs so the API uses the RIGHT face
+          uploadIds: newUploadIds.length > 0 ? newUploadIds : undefined,
         };
 
         // Create a new generation row for this credit use
