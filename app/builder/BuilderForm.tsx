@@ -642,7 +642,7 @@ export function BuilderForm() {
               <input
                 type="text"
                 value={promoCode}
-                onChange={(e) => { setPromoCode(e.target.value.toUpperCase()); setPromoError(null); }}
+                onChange={(e) => { setPromoCode(e.target.value); setPromoError(null); }}
                 placeholder="BOBBLE-XXXXXX"
                 className={inputClass + " flex-1 font-mono tracking-wider"}
               />
