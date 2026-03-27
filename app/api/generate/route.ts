@@ -306,72 +306,115 @@ BODY AND PROPORTIONS:
 - No metal support rods or sticks
 - Solid pure white (#FFFFFF) background, no scenery`;
     }
-    console.log(`[AI Engine] Initializing Nano Banana Pro (Gemini) pipeline for Order: ${orderId}...`);
-    console.log(`[AI Engine] Prompt: ${prompt}`);
+    console.log(`[AI Engine] Initializing Nano Banana 2 (Gemini 3.1 Flash Image) for Order: ${orderId}...`);
+    console.log(`[AI Engine] Prompt length: ${prompt.length} chars`);
     
-    // 5. API Call to Nano Banana Pro (Gemini / Imagen 4.0) — generate 4 previews
-    const url = `https://generativelanguage.googleapis.com/v1beta/models/imagen-4.0-generate-001:predict?key=${GEMINI_API_KEY}`;
-    const aiResponse = await fetch(url, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        instances: [{ prompt: prompt }],
-        parameters: { sampleCount: 4, sampleImageSize: "2K" }
-      })
-    });
-
-    if (!aiResponse.ok) {
-      const errorText = await aiResponse.text();
-      console.error("[AI Engine] Error from Gemini API:", errorText);
-      throw new Error("Failed to generate image from AI provider.");
-    }
-
-    const data = await aiResponse.json();
-    let predictions = data.predictions || [];
-    if (predictions.length === 0) throw new Error("No images returned from AI provider.");
-
-    // If fewer than 4 came back (safety filter), retry aggressively
-    // Always request 4 per call to maximize yield past safety filters
-    const MAX_RETRIES = 3;
-    let retryCount = 0;
-    while (predictions.length < 4 && retryCount < MAX_RETRIES) {
-      retryCount++;
-      const needed = 4 - predictions.length;
-      console.log(`[AI Engine] Only got ${predictions.length}/4, retry ${retryCount}/${MAX_RETRIES} — requesting 4 more...`);
-      try {
-        const retryRes = await fetch(url, {
-          method: 'POST',
-          headers: { 'Content-Type': 'application/json' },
-          body: JSON.stringify({
-            instances: [{ prompt: prompt }],
-            parameters: { sampleCount: 4, sampleImageSize: "2K" }
-          })
-        });
-        if (retryRes.ok) {
-          const retryData = await retryRes.json();
-          const retryPreds = retryData.predictions || [];
-          console.log(`[AI Engine] Retry ${retryCount} returned ${retryPreds.length} images`);
-          predictions = [...predictions, ...retryPreds].slice(0, 4);
-        } else {
-          console.log(`[AI Engine] Retry ${retryCount} failed with status ${retryRes.status}`);
+    // 5. Generate 4 previews using Nano Banana 2 (gemini-3.1-flash-image-preview)
+    // Supports up to 14 reference images, 4K resolution, and improved face likeness
+    const geminiImageUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`;
+    
+    // Build the content parts: text prompt + reference photo
+    const contentParts: any[] = [
+      { text: prompt + "\n\nIMPORTANT: The reference photo below shows the EXACT person whose face must appear on this bobblehead. Match their facial features, skin tone, hair, and any distinctive characteristics as closely as possible. The face on the bobblehead must be INSTANTLY RECOGNIZABLE as this specific person." }
+    ];
+    
+    // Add the reference photo(s) as inline data so the model can SEE the face
+    if (uploads && uploads.length > 0) {
+      for (const upload of uploads) {
+        try {
+          const imgRes = await fetch(upload.image_url);
+          const imgBuffer = await imgRes.arrayBuffer();
+          const base64Img = Buffer.from(imgBuffer).toString('base64');
+          contentParts.push({
+            inlineData: { mimeType: "image/jpeg", data: base64Img }
+          });
+        } catch (e) {
+          console.log(`[AI Engine] Could not fetch upload ${upload.id}, skipping`);
         }
-      } catch (e) {
-        console.log(`[AI Engine] Retry ${retryCount} error, continuing...`);
       }
     }
+    
+    // Fire 4 parallel requests (Nano Banana 2 generates 1 image per call)
+    const generateOne = async (index: number): Promise<string | null> => {
+      try {
+        const res = await fetch(geminiImageUrl, {
+          method: 'POST',
+          headers: { 
+            'Content-Type': 'application/json',
+            'x-goog-api-key': GEMINI_API_KEY!,
+          },
+          body: JSON.stringify({
+            contents: [{ parts: contentParts }],
+            generationConfig: {
+              responseModalities: ["TEXT", "IMAGE"],
+              temperature: 1.0,  // Add variation between the 4 results
+              imageConfig: {
+                aspectRatio: "3:4",
+                imageSize: "2K",
+              },
+            }
+          })
+        });
+        
+        if (!res.ok) {
+          const errText = await res.text();
+          console.error(`[AI Engine] Preview ${index} failed (${res.status}):`, errText);
+          return null;
+        }
+        
+        const data = await res.json();
+        // Extract image from response parts
+        if (data.candidates && data.candidates[0]?.content?.parts) {
+          for (const part of data.candidates[0].content.parts) {
+            if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
+              return part.inlineData.data; // base64 image
+            }
+          }
+        }
+        console.log(`[AI Engine] Preview ${index}: no image in response`);
+        return null;
+      } catch (e) {
+        console.error(`[AI Engine] Preview ${index} error:`, e);
+        return null;
+      }
+    };
+    
+    console.log(`[AI Engine] Firing 4 parallel image generation requests...`);
+    const results = await Promise.all([
+      generateOne(0),
+      generateOne(1),
+      generateOne(2),
+      generateOne(3),
+    ]);
+    
+    let predictions = results.filter((r): r is string => r !== null);
+    console.log(`[AI Engine] Nano Banana 2: Got ${predictions.length}/4 successful generations`);
+    
+    // Retry if we got fewer than 2
+    const MAX_RETRIES = 3;
+    let retryCount = 0;
+    while (predictions.length < 2 && retryCount < MAX_RETRIES) {
+      retryCount++;
+      const needed = 4 - predictions.length;
+      console.log(`[AI Engine] Only got ${predictions.length}/4, retry ${retryCount}/${MAX_RETRIES} — requesting ${needed} more...`);
+      const retryResults = await Promise.all(
+        Array.from({ length: needed }, (_, i) => generateOne(predictions.length + i))
+      );
+      const newPreds = retryResults.filter((r): r is string => r !== null);
+      predictions = [...predictions, ...newPreds].slice(0, 4);
+    }
 
-    // Ensure we have at least 2 previews for a reasonable experience
     if (predictions.length < 2) {
       console.error(`[AI Engine] Only got ${predictions.length} preview(s) after ${MAX_RETRIES} retries — insufficient.`);
       throw new Error(`Only ${predictions.length} preview(s) could be generated. The AI safety filter may be blocking this image. Please try a different photo.`);
     }
 
-    console.log(`[AI Engine] Final count: ${predictions.length} preview images!`);
+    console.log(`[AI Engine] Nano Banana 2: Final count: ${predictions.length} preview images!`);
     
     // 6. Upload all previews to Supabase Storage
     const previewUrls: string[] = [];
     for (let i = 0; i < predictions.length; i++) {
-      const base64Image = predictions[i].bytesBase64Encoded;
+      const base64Image = predictions[i]; // Already a base64 string from Nano Banana 2
       if (!base64Image) continue;
       
       const imageBuffer = Buffer.from(base64Image, 'base64');
