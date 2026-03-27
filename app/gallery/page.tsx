@@ -49,46 +49,67 @@ export default async function GalleryPage() {
             </p>
           </div>
 
-          {galleryItems.length === 0 ? (
-            <div className="text-center py-20">
-              <div className="text-6xl mb-4">🗿</div>
-              <h2 className="text-xl font-bold mb-2">Gallery is Empty... For Now!</h2>
-              <p className="text-muted-foreground mb-6">Be the first to submit your bobblehead to the gallery!</p>
-              <Link
-                href="/pricing"
-                className="inline-flex items-center justify-center rounded-full text-sm font-bold bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:from-purple-700 hover:to-pink-600 h-12 px-8 shadow-lg hover:shadow-xl hover:scale-105 transition-all duration-300"
-              >
-                🎨 Create Your Bobblehead
-              </Link>
-            </div>
-          ) : (
-            <div className="columns-2 md:columns-3 gap-4 space-y-4">
-              {galleryItems.map((item) => {
-                const details = (item.theme_details || {}) as Record<string, any>;
-                const label = item.theme_type === 'sport'
-                  ? `${details.teamName || details.sport || 'Sports'}`
-                  : `${details.occupation || 'Custom'}`;
-
-                return (
-                  <div
-                    key={item.id}
-                    className="break-inside-avoid rounded-xl overflow-hidden bg-white border shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 group"
-                  >
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img
-                      src={item.output_image_url!}
-                      alt={`${item.nameplate || 'Bobblehead'}`}
-                      className="w-full object-cover"
-                      loading="lazy"
-                    />
-                    <div className="p-3">
-                      <p className="font-bold text-sm truncate">{item.nameplate || 'BobbleMe!'}</p>
-                      <p className="text-xs text-muted-foreground capitalize">{label}</p>
-                    </div>
+          {/* Featured Showcase */}
+          <div className="mb-12">
+            <h2 className="text-xl font-bold text-center mb-6 text-muted-foreground">⭐ Featured Creations</h2>
+            <div className="columns-2 md:columns-4 gap-4 space-y-4">
+              {[
+                { src: '/samples/demo-1.png', name: 'The MVP', style: 'Sports' },
+                { src: '/samples/demo-2.png', name: 'All-Star', style: 'Sports' },
+                { src: '/samples/demo-3.png', name: 'Game Day', style: 'Sports' },
+                { src: '/samples/demo-4.png', name: 'The Rookie', style: 'Sports' },
+                { src: '/samples/demo-5.png', name: 'Top Chef', style: 'Occupation' },
+                { src: '/samples/demo-6.png', name: 'Dr. Cool', style: 'Occupation' },
+                { src: '/samples/demo-7.png', name: 'Good Boy', style: 'Pet' },
+                { src: '/samples/demo-8.png', name: 'Whiskers', style: 'Pet' },
+              ].map((item, i) => (
+                <div
+                  key={`showcase-${i}`}
+                  className="break-inside-avoid rounded-xl overflow-hidden bg-white border shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300"
+                >
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img src={item.src} alt={item.name} className="w-full object-cover" loading="lazy" />
+                  <div className="p-3">
+                    <p className="font-bold text-sm truncate">{item.name}</p>
+                    <p className="text-xs text-muted-foreground">{item.style}</p>
                   </div>
-                );
-              })}
+                </div>
+              ))}
             </div>
+          </div>
+
+          {/* User-submitted gallery */}
+          {galleryItems.length > 0 && (
+            <>
+              <h2 className="text-xl font-bold text-center mb-6 text-muted-foreground">🎨 Community Creations</h2>
+              <div className="columns-2 md:columns-3 gap-4 space-y-4">
+                {galleryItems.map((item) => {
+                  const details = (item.theme_details || {}) as Record<string, any>;
+                  const label = item.theme_type === 'sport'
+                    ? `${details.teamName || details.sport || 'Sports'}`
+                    : `${details.occupation || 'Custom'}`;
+
+                  return (
+                    <div
+                      key={item.id}
+                      className="break-inside-avoid rounded-xl overflow-hidden bg-white border shadow-lg hover:shadow-2xl hover:scale-[1.02] transition-all duration-300 group"
+                    >
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        src={item.output_image_url!}
+                        alt={`${item.nameplate || 'Bobblehead'}`}
+                        className="w-full object-cover"
+                        loading="lazy"
+                      />
+                      <div className="p-3">
+                        <p className="font-bold text-sm truncate">{item.nameplate || 'BobbleMe!'}</p>
+                        <p className="text-xs text-muted-foreground capitalize">{label}</p>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </>
           )}
         </div>
       </main>
