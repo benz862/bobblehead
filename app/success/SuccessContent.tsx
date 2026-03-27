@@ -133,11 +133,20 @@ export default function SuccessContent() {
       setTimeout(() => setCopied(false), 2000);
     }
   };
+  const [gallerySubmitted, setGallerySubmitted] = useState(false);
 
   const handleSubmitToGallery = async () => {
     if (!orderId) return;
-    await supabase.from('generations').update({ show_in_gallery: true }).eq('order_id', orderId);
+    // Update the most recently completed generation for this order
+    await supabase
+      .from('generations')
+      .update({ show_in_gallery: true })
+      .eq('order_id', orderId)
+      .eq('status', 'completed')
+      .order('created_at', { ascending: false })
+      .limit(1);
     setShowGalleryOpt(false);
+    setGallerySubmitted(true);
   };
 
   const currentStepIndex = PROGRESS_STEPS.findIndex(s => s.key === status);
@@ -418,7 +427,9 @@ export default function SuccessContent() {
                 </div>
 
                 {/* Gallery opt-in */}
-                {!showGalleryOpt ? (
+                {gallerySubmitted ? (
+                  <p className="mt-3 text-xs text-green-600 font-medium">✅ Submitted to Gallery! It'll appear shortly.</p>
+                ) : !showGalleryOpt ? (
                   <button
                     onClick={() => setShowGalleryOpt(true)}
                     className="mt-3 text-xs text-primary hover:underline"
