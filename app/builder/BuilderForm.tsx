@@ -214,7 +214,7 @@ export function BuilderForm() {
         <p className="text-sm text-muted-foreground">Pick your look, upload your face, and let the magic happen!</p>
         <div className="mt-3 inline-flex items-center gap-2 bg-purple-100 text-purple-800 font-bold text-sm px-4 py-2 rounded-full">
           <span>{tierEmoji}</span>
-          <span>{tierLabel} Pack — {tier} {tier === 1 ? 'bobblehead' : 'bobbleheads'}</span>
+          <span>{tierLabel} — {tier} {tier === 1 ? 'bobblehead' : 'bobbleheads'}</span>
           <span className="text-purple-500">|</span>
           <span>${(price / 100).toFixed(2)}</span>
         </div>
