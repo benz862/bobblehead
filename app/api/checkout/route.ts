@@ -52,12 +52,16 @@ export async function POST(req: Request) {
 
     // PROMO CODE CHECK
     if (promoCode) {
-      const expiresAt = process.env.PROMO_EXPIRES 
-        ? new Date(process.env.PROMO_EXPIRES) 
-        : new Date(Date.now() + 24 * 60 * 60 * 1000);
+      // Campaign codes (BOBBLE-XXXXXXXX) don't expire — skip the time check for them
+      const isCampaignCode = promoCode.toUpperCase().startsWith("BOBBLE-");
+      if (!isCampaignCode) {
+        const expiresAt = process.env.PROMO_EXPIRES 
+          ? new Date(process.env.PROMO_EXPIRES) 
+          : new Date(Date.now() + 24 * 60 * 60 * 1000);
 
-      if (new Date() > expiresAt) {
-        return NextResponse.json({ error: "This promo code has expired." }, { status: 400 });
+        if (new Date() > expiresAt) {
+          return NextResponse.json({ error: "This promo code has expired." }, { status: 400 });
+        }
       }
 
       // Look up the code in the database

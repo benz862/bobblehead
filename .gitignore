@@ -26,7 +26,10 @@ yarn-error.log*
 .pnpm-debug.log*
 
 # local env files
+.env
 .env*.local
+ETSY Emails.csv
+coupon_codes_tracking.csv
 
 # vercel
 .vercel
