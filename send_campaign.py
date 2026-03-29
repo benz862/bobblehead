@@ -150,7 +150,6 @@ def store_codes_in_supabase(mapping: dict[str, str]) -> None:
         {
             "email": email,
             "promo_code": code,
-            "verified": True,       # Pre-verified — email IS the verification
             "redeemed": False,
             "created_at": now,
         }

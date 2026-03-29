@@ -73,11 +73,11 @@ export async function POST(req: Request) {
 
       const { data: promoRecord } = await supabase
         .from("promo_emails")
-        .select("email, verified, redeemed, promo_code")
+        .select("email, redeemed, promo_code")
         .eq("promo_code", promoCode.toUpperCase().trim())
         .single();
 
-      if (!promoRecord || !promoRecord.verified) {
+      if (!promoRecord) {
         return NextResponse.json({ error: "Invalid promo code." }, { status: 400 });
       }
 
