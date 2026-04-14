@@ -145,7 +145,7 @@ export function BuilderForm() {
             uploadedUrls.push(publicUrlData.publicUrl);
           }
           // Insert new upload records and capture their IDs
-          const uploadInserts = uploadedUrls.map(url => ({ order_id: parseInt(orderId), image_url: url }));
+          const uploadInserts = uploadedUrls.map(url => ({ order_id: orderId, image_url: url }));
           const { data: insertedUploads } = await supabase.from('uploads').insert(uploadInserts).select('id');
           if (insertedUploads) {
             newUploadIds = insertedUploads.map((u: any) => u.id);
@@ -164,7 +164,7 @@ export function BuilderForm() {
 
         // Create a new generation row for this credit use
         await supabase.from('generations').insert([{
-          order_id: parseInt(orderId),
+          order_id: orderId,
           theme_type: themeType,
           theme_details: themeDetails,
           nameplate: nameplate,
