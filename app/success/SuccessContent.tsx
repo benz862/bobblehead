@@ -27,6 +27,7 @@ export default function SuccessContent() {
   const [showGalleryOpt, setShowGalleryOpt] = useState(false);
   const [creditsTotal, setCreditsTotal] = useState(1);
   const [creditsUsed, setCreditsUsed] = useState(0);
+  const [errorDetail, setErrorDetail] = useState<string | null>(null);
 
   const processOrder = useCallback(async () => {
     if (!orderId) {
@@ -68,8 +69,9 @@ export default function SuccessContent() {
         setPreviewUrls(data.previewUrls);
         setStatus("selecting");
       }
-    } catch (err) {
+    } catch (err: any) {
       console.error(err);
+      setErrorDetail(err?.message || String(err));
       setStatus("error");
     }
   }, [orderId]);
@@ -123,6 +125,7 @@ export default function SuccessContent() {
     setPreviewUrls([]);
     setFinalImageUrl(null);
     setSelectedIndex(null);
+    setErrorDetail(null);
     processOrder();
   };
 
@@ -454,7 +457,8 @@ export default function SuccessContent() {
             <div className="flex flex-col items-center animate-in fade-in duration-300">
               <div className="h-16 w-16 rounded-full bg-destructive/10 text-destructive flex items-center justify-center mb-4 text-2xl">😵</div>
               <h1 className="text-2xl font-bold">Oops! Something Went Wonky</h1>
-              <p className="text-muted-foreground mt-2 mb-6">We hit a bump creating your bobblehead. Try again or reach out to us for help!</p>
+              <p className="text-muted-foreground mt-2 mb-4">We hit a bump creating your bobblehead. Try again or reach out to us for help!</p>
+              {errorDetail && <p className="text-xs font-mono bg-muted rounded-lg px-4 py-2 text-destructive mb-4 max-w-md break-all">{errorDetail}</p>}
               <div className="flex gap-3">
                 <button 
                   onClick={handleRetry}
