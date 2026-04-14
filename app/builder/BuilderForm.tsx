@@ -178,7 +178,7 @@ export function BuilderForm() {
       
       const { data: order, error } = await supabase
         .from('orders')
-        .insert([{ tier, status: 'pending', credits_total: tier, credits_used: 0 }])
+        .insert([{ tier, amount: price, status: 'pending', credits_total: tier, credits_used: 0 }])
         .select()
         .single();
         
