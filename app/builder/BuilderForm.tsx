@@ -4,7 +4,7 @@ import { useState, useEffect } from "react";
 import { useSearchParams } from "next/navigation";
 import { supabase } from "@/lib/supabase";
 import { SPORT_TEAMS, SPORT_ORIENTATIONS, SPORT_POSITIONS, SOCCER_LEAGUES, type Team } from "@/lib/teams";
-import { Upload, X, ChevronRight, Loader2, Camera, Palette, Trophy, ShoppingCart, Gift } from "lucide-react";
+import { Upload, X, ChevronRight, Loader2, Camera, Palette, Trophy, ShoppingCart, Gift, Sparkles } from "lucide-react";
 
 const STEPS = [
   { label: "Upload", icon: Camera, emoji: "📸" },
@@ -67,6 +67,61 @@ export function BuilderForm() {
   const [petBreed, setPetBreed] = useState("");
   const [petCostume, setPetCostume] = useState("");
 
+  // Free-form customization
+  const [freeformDetails, setFreeformDetails] = useState("");
+  const [originalFreeform, setOriginalFreeform] = useState<string | null>(null);
+  const [isEnhancing, setIsEnhancing] = useState(false);
+  const [enhanced, setEnhanced] = useState(false);
+  const [enhanceError, setEnhanceError] = useState<string | null>(null);
+
+  const handleEnhance = async () => {
+    if (!freeformDetails.trim()) return;
+    setIsEnhancing(true);
+    setEnhanceError(null);
+    const snapshot = freeformDetails; // save original BEFORE any changes
+    setOriginalFreeform(snapshot);
+    try {
+      const themeSummary = themeType === "sport"
+        ? `${sport} player${selectedTeam ? ` for ${selectedTeam.name}` : ""}`
+        : themeType === "occupation"
+        ? occupation === "custom" ? customOccupation : occupation
+        : themeType === "pet"
+        ? `${petBreed || animalType} pet bobblehead`
+        : "";
+      const res = await fetch("/api/enhance-prompt", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ rawText: snapshot, themeType, themeSummary }),
+      });
+      const data = await res.json();
+      // Only replace if we got something meaningful back (longer than 10 chars)
+      if (data.enhancedText && data.enhancedText.trim().length > 10) {
+        setFreeformDetails(data.enhancedText.trim());
+        setEnhanced(true);
+      } else {
+        // Restore original and show error
+        setFreeformDetails(snapshot);
+        setOriginalFreeform(null);
+        setEnhanceError("Enhancement returned nothing useful — your original text was kept.");
+      }
+    } catch (e) {
+      console.error("Enhance failed", e);
+      setFreeformDetails(snapshot); // always restore on error
+      setOriginalFreeform(null);
+      setEnhanceError("Enhancement failed — your original text was kept.");
+    } finally {
+      setIsEnhancing(false);
+    }
+  };
+
+  const handleUndoEnhance = () => {
+    if (originalFreeform !== null) {
+      setFreeformDetails(originalFreeform);
+      setOriginalFreeform(null);
+      setEnhanced(false);
+    }
+  };
+
   // Promo state — read from URL if the user clicked the email link
   const promoParam = searchParams.get('promo') || '';
   const [promoCode, setPromoCode] = useState(promoParam);
@@ -76,7 +131,7 @@ export function BuilderForm() {
   // Calculate current step for the progress indicator
   const getCurrentStep = () => {
     if (images.length === 0) return 0;
-    if (!themeType) return 1;
+    if (!themeType && !freeformDetails.trim()) return 1;
     if (themeType === "sport" && !sport) return 1;
     if (themeType === "occupation" && !occupation) return 1;
     if (themeType === "pet" && !animalType) return 1;
@@ -126,6 +181,9 @@ export function BuilderForm() {
       setIsProcessing(true);
       setErrorMessage(null);
 
+      // Default to 'occupation' for freeform-only orders (no style card selected)
+      const effectiveThemeType = themeType ?? 'occupation';
+
       // If returning to use a credit, reuse the existing order
       if (existingOrderId && creditInfo && creditInfo.used < creditInfo.total) {
         const orderId = existingOrderId;
@@ -158,6 +216,7 @@ export function BuilderForm() {
           sport, teamName: finalTeamName, teamColors, jersey, position, orientations, sportCustomDetails,
           occupation: finalOccupation, customProps,
           animalType: animalType === 'custom' ? petBreed : animalType, petBreed, petCostume,
+          freeformDetails: freeformDetails.trim() || undefined,
           // Tag this generation with the specific upload IDs so the API uses the RIGHT face
           uploadIds: newUploadIds.length > 0 ? newUploadIds : undefined,
         };
@@ -165,7 +224,7 @@ export function BuilderForm() {
         // Create a new generation row for this credit use
         await supabase.from('generations').insert([{
           order_id: orderId,
-          theme_type: themeType,
+          theme_type: effectiveThemeType,
           theme_details: themeDetails,
           nameplate: nameplate,
           status: 'pending'
@@ -225,11 +284,12 @@ export function BuilderForm() {
         animalType: animalType === 'custom' ? petBreed : animalType,
         petBreed,
         petCostume,
+        freeformDetails: freeformDetails.trim() || undefined,
       };
       
       await supabase.from('generations').insert([{
         order_id: order.id,
-        theme_type: themeType,
+        theme_type: effectiveThemeType,
         theme_details: themeDetails,
         nameplate: nameplate,
         status: 'pending'
@@ -630,6 +690,57 @@ export function BuilderForm() {
         </div>
       </div>
 
+      {/* Step 4: Free-form Customization */}
+      <div className="space-y-3">
+        <div className="flex items-center justify-between">
+          <h3 className="font-semibold text-sm tracking-wide uppercase text-primary/80">✨ 4. Make It Yours <span className="normal-case font-normal text-muted-foreground">(Optional)</span></h3>
+          {enhanced && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs font-medium text-purple-600 bg-purple-100 px-2 py-0.5 rounded-full flex items-center gap-1">
+                <Sparkles className="h-3 w-3" /> AI Enhanced
+              </span>
+              <button
+                type="button"
+                onClick={handleUndoEnhance}
+                className="text-xs text-muted-foreground hover:text-foreground underline transition-colors"
+              >
+                ↩ Undo
+              </button>
+            </div>
+          )}
+        </div>
+        <div className="relative">
+          <textarea
+            value={freeformDetails}
+            onChange={(e) => { setFreeformDetails(e.target.value); setEnhanced(false); setEnhanceError(null); }}
+            placeholder={`Describe any extra customizations in plain English, for example:\n• Rainbow coloured hair\n• Add a thick beard\n• Grass covering the base instead of plain pedestal\n• No pedestal — just standing on white background\n• Embossed wooden nameplate instead of metal\n• Wearing a kilt\n• Holding a glass of whisky\n• Confetti and balloons around the figure\n\nOr paste in a full AI-generated prompt — no limit!`}
+            className="flex w-full rounded-xl border border-input bg-background px-4 py-3 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring transition-all duration-200 min-h-[120px] resize-y"
+            rows={5}
+          />
+          <p className="text-xs text-muted-foreground text-right mt-1">{freeformDetails.length} chars</p>
+        </div>
+        {enhanceError && (
+          <p className="text-xs text-amber-600 bg-amber-50 border border-amber-200 rounded-lg px-3 py-2">
+            ⚠️ {enhanceError}
+          </p>
+        )}
+        <div className="flex items-center gap-3">
+          <button
+            type="button"
+            onClick={handleEnhance}
+            disabled={!freeformDetails.trim() || isEnhancing}
+            className="inline-flex items-center gap-2 px-4 h-9 rounded-full border-2 border-purple-300 bg-gradient-to-r from-purple-50 to-pink-50 text-purple-700 text-sm font-semibold hover:from-purple-100 hover:to-pink-100 hover:border-purple-400 transition-all duration-200 disabled:opacity-40 disabled:pointer-events-none shadow-sm"
+          >
+            {isEnhancing ? (
+              <><Loader2 className="h-3.5 w-3.5 animate-spin" /> Enhancing...</>
+            ) : (
+              <><Sparkles className="h-3.5 w-3.5" /> Enhance with AI</>
+            )}
+          </button>
+          <p className="text-xs text-muted-foreground">AI will expand your ideas into a richer prompt</p>
+        </div>
+      </div>
+
       {/* Promo Code Section */}
       <div className="pt-4 border-t mt-8">
         <button
@@ -657,14 +768,13 @@ export function BuilderForm() {
               )}
             </div>
             {promoError && <p className="text-xs text-destructive">{promoError}</p>}
-            {!promoCode && <p className="text-xs text-muted-foreground">Don&apos;t have a code? <a href="/pricing" className="text-primary hover:underline">Get one free on our pricing page!</a></p>}
           </div>
         )}
 
         {/* Checkout */}
         <button 
           onClick={handleCheckout}
-          disabled={(images.length === 0 && existingUploads.length === 0) || !themeType || isProcessing}
+          disabled={(images.length === 0 && existingUploads.length === 0) || (!themeType && !freeformDetails.trim()) || isProcessing}
           className="w-full inline-flex items-center justify-center gap-2 rounded-full text-sm font-bold ring-offset-background transition-all duration-300 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50 bg-gradient-to-r from-purple-600 to-pink-500 text-white hover:from-purple-700 hover:to-pink-600 hover:shadow-xl hover:scale-[1.02] h-14 px-8"
         >
           {isProcessing ? (

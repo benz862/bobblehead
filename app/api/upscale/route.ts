@@ -1,5 +1,12 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import { createClient } from "@supabase/supabase-js";
+import sharp from "sharp";
+
+// Server-side routes must use the service-role key to bypass RLS.
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(req: Request) {
   try {
@@ -9,23 +16,34 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Missing orderId or selectedImageUrl" }, { status: 400 });
     }
 
-    // Previews are already generated at 2048×2048 (2K) by Imagen 4.0.
-    // This step just downloads the selected preview and saves it as the final image.
-    console.log(`[Upscale] Downloading selected 2K preview for order ${orderId}...`);
+    // Download the selected preview
+    console.log(`[Upscale] Downloading selected preview for order ${orderId}...`);
     const imgRes = await fetch(selectedImageUrl);
-    const imgBuffer = await imgRes.arrayBuffer();
-    const finalBase64 = Buffer.from(imgBuffer).toString('base64');
+    const imgBuffer = Buffer.from(await imgRes.arrayBuffer());
 
     const sizeKB = Math.round(imgBuffer.byteLength / 1024);
-    console.log(`[Upscale] Preview size: ${sizeKB}KB`);
+    console.log(`[Upscale] Original preview size: ${sizeKB}KB`);
 
-    // Upload final image to Supabase Storage
-    const imageBuffer = Buffer.from(finalBase64, 'base64');
+    // Read original dimensions, then upscale 4× using Lanczos3 (high-quality)
+    const metadata = await sharp(imgBuffer).metadata();
+    const origW = metadata.width  ?? 1024;
+    const origH = metadata.height ?? 1365;
+    const targetW = origW * 4;
+    const targetH = origH * 4;
+    console.log(`[Upscale] ${origW}×${origH} → ${targetW}×${targetH} (4× Lanczos)`);
+
+    const upscaledBuffer = await sharp(imgBuffer)
+      .resize(targetW, targetH, { kernel: sharp.kernel.lanczos3 })
+      .png({ compressionLevel: 6, quality: 100 })
+      .toBuffer();
+
+    const upscaledKB = Math.round(upscaledBuffer.byteLength / 1024);
+    console.log(`[Upscale] Upscaled size: ${upscaledKB}KB`);
     const fileName = `final-${orderId}-${Date.now()}.png`;
 
     const { error: uploadError } = await supabase.storage
       .from('user-uploads')
-      .upload(fileName, imageBuffer, { contentType: 'image/png' });
+      .upload(fileName, upscaledBuffer, { contentType: 'image/png' });
 
     if (uploadError) {
       console.error("[Upscale] Failed to upload final image:", uploadError);

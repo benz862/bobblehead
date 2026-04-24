@@ -1,34 +1,8 @@
 "use client";
 
-import { useState } from "react";
 import Link from "next/link";
-import { Loader2 } from "lucide-react";
 
 export default function PricingPage() {
-  const [promoEmail, setPromoEmail] = useState("");
-  const [promoLoading, setPromoLoading] = useState(false);
-  const [promoError, setPromoError] = useState<string | null>(null);
-  const [codeSent, setCodeSent] = useState(false);
-
-  const handleSendCode = async () => {
-    if (!promoEmail.includes("@")) { setPromoError("Enter a valid email."); return; }
-    setPromoLoading(true);
-    setPromoError(null);
-    try {
-      const res = await fetch("/api/promo", {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email: promoEmail }),
-      });
-      const data = await res.json();
-      if (!res.ok) throw new Error(data.error);
-      setCodeSent(true);
-    } catch (err: any) {
-      setPromoError(err.message || "Failed to send code.");
-    } finally {
-      setPromoLoading(false);
-    }
-  };
 
   const tiers = [
     {
@@ -85,49 +59,6 @@ export default function PricingPage() {
           Each bobblehead gets 4 unique previews to pick from, then your favorite is polished to full HD! ✨
         </p>
 
-        {/* Promo Banner */}
-        <div className="w-full max-w-xl mb-10 p-5 rounded-2xl bg-gradient-to-r from-purple-600 via-pink-500 to-yellow-500 text-white shadow-2xl relative overflow-hidden">
-          <div className="absolute inset-0 bg-white/5 backdrop-blur-sm" />
-          <div className="relative z-10">
-            {!codeSent ? (
-              <>
-                <div className="flex items-center gap-2 mb-2">
-                  <span className="text-2xl">🎁</span>
-                  <h3 className="text-lg font-extrabold">Limited Time — FREE Bobblehead!</h3>
-                </div>
-                <p className="text-sm text-white/80 mb-4">Enter your email and we&apos;ll send you a unique promo code for a free bobblehead. No credit card needed!</p>
-                <div className="flex gap-2">
-                  <input
-                    type="email"
-                    value={promoEmail}
-                    onChange={(e) => { setPromoEmail(e.target.value); setPromoError(null); }}
-                    placeholder="your@email.com"
-                    className="flex-1 h-11 rounded-lg px-4 text-sm text-foreground bg-white border-0 focus:outline-none focus:ring-2 focus:ring-white/50"
-                  />
-                  <button
-                    onClick={handleSendCode}
-                    disabled={promoLoading}
-                    className="h-11 px-6 rounded-lg bg-white text-purple-700 font-bold text-sm hover:bg-purple-50 transition-all disabled:opacity-60 flex items-center gap-2"
-                  >
-                    {promoLoading ? <Loader2 className="h-4 w-4 animate-spin" /> : "🚀"}
-                    Send Code
-                  </button>
-                </div>
-                {promoError && <p className="text-xs text-yellow-200 mt-2">⚠️ {promoError}</p>}
-              </>
-            ) : (
-              <div className="text-center py-2">
-                <span className="text-3xl mb-2 block">📬</span>
-                <h3 className="text-lg font-extrabold mb-1">Check Your Inbox!</h3>
-                <p className="text-sm text-white/80">We sent a verification code to <strong>{promoEmail}</strong>.</p>
-                <p className="text-sm text-white/80 mt-1">Verify your email, get your code, and click the link to start building!</p>
-                <button onClick={() => { setCodeSent(false); setPromoEmail(""); }} className="text-xs text-white/60 hover:text-white mt-3 underline">
-                  Use a different email
-                </button>
-              </div>
-            )}
-          </div>
-        </div>
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6 max-w-4xl w-full">
           {tiers.map((tier) => (

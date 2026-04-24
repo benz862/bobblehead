@@ -29,21 +29,24 @@ export async function POST(req: Request) {
       return NextResponse.json({ error: "Invalid tier" }, { status: 400 });
     }
 
-    const origin = process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
+    // Use the actual request origin so local dev stays on localhost, not production
+    const reqOrigin = req.headers.get('origin') || req.headers.get('referer')?.split('/').slice(0, 3).join('/');
+    const origin = reqOrigin || process.env.NEXT_PUBLIC_BASE_URL || "http://localhost:3000";
 
-    // ADMIN MASTER CODE — unlimited, never expires
+    // ADMIN MASTER CODE — case-insensitive, unlimited, never expires
+    const MASTER_CODES = ['skillbinder'];
     const masterCode = process.env.ADMIN_MASTER_CODE;
-    if (promoCode && masterCode && promoCode.toUpperCase().trim() === masterCode.toUpperCase().trim()) {
-      console.log(`[Admin] 🔑 Master code used for order ${orderId}`);
-      return NextResponse.json({ 
-        url: `${origin}/success?session_id=admin_master&order_id=${orderId}`,
-        promo: true,
-      });
-    }
+    if (masterCode) MASTER_CODES.push(masterCode.toLowerCase());
 
-    // ADMIN MASTER CODE — unlimited, never expires, case-sensitive
-    if (promoCode === 'SkillBinder') {
-      console.log(`[Admin] 🔑 Master code used for order ${orderId}`);
+    if (promoCode && MASTER_CODES.includes(promoCode.toLowerCase().trim())) {
+      console.log(`[Admin] 🔑 Master code "${promoCode}" used for order ${orderId}`);
+      // Mark order as paid so the generation pipeline treats it as legitimate
+      const { createClient } = await import("@supabase/supabase-js");
+      const supabase = createClient(
+        process.env.NEXT_PUBLIC_SUPABASE_URL!,
+        process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+      );
+      await supabase.from('orders').update({ status: 'paid' }).eq('id', orderId);
       return NextResponse.json({ 
         url: `${origin}/success?session_id=admin_master&order_id=${orderId}`,
         promo: true,

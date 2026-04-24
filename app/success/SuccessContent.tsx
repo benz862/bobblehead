@@ -3,8 +3,9 @@
 import { useEffect, useState, useCallback } from "react";
 import { useSearchParams } from "next/navigation";
 import Link from "next/link";
-import { ArrowLeft, CheckCircle2, Loader2, Download, Share2, Copy, ExternalLink, RotateCcw, ZoomIn, ChevronLeft } from "lucide-react";
+import { ArrowLeft, CheckCircle2, Loader2, Download, Share2, Copy, ExternalLink, RotateCcw, ZoomIn, ChevronLeft, ChevronRight } from "lucide-react";
 import { supabase } from "@/lib/supabase";
+import { UpsellOffer } from "./UpsellOffer";
 
 const PROGRESS_STEPS = [
   { key: "verifying", label: "Verifying Order", emoji: "🎟️" },
@@ -233,50 +234,98 @@ export default function SuccessContent() {
           {status === "selecting" && (
             <div className="flex flex-col items-center animate-in fade-in slide-in-from-bottom-4 duration-500">
               {zoomedIndex !== null ? (
-                /* === ZOOMED SINGLE PREVIEW === */
+                /* === CAROUSEL VIEW === */
                 <>
-                  <button
-                    onClick={() => setZoomedIndex(null)}
-                    className="flex items-center gap-2 text-sm font-medium text-primary hover:text-primary/80 transition-colors mb-4 self-start"
-                  >
-                    <ChevronLeft className="h-4 w-4" />
-                    Back to All Previews
-                  </button>
-                  <h1 className="text-2xl font-bold mb-2">🔍 Preview #{zoomedIndex + 1}</h1>
+                  {/* Header row */}
+                  <div className="flex items-center justify-between w-full mb-3">
+                    <button
+                      onClick={() => setZoomedIndex(null)}
+                      className="flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-primary transition-colors"
+                    >
+                      <ChevronLeft className="h-4 w-4" />
+                      All Previews
+                    </button>
+                    <span className="text-sm font-semibold text-muted-foreground">
+                      {zoomedIndex + 1} / {previewUrls.length}
+                    </span>
+                  </div>
+
+                  <h1 className="text-2xl font-bold mb-1">🔍 Preview #{zoomedIndex + 1}</h1>
                   <p className="text-muted-foreground mb-4 text-sm">
-                    Take a close look! If you like it, hit the button below to finalize.
+                    Navigate with the arrows, then choose your favourite!
                   </p>
-                  
-                  <div className="relative rounded-xl overflow-hidden shadow-2xl border-2 border-primary/20 bg-white dark:bg-zinc-900 p-2 w-full max-w-lg">
-                    {/* eslint-disable-next-line @next/next/no-img-element */}
-                    <img 
-                      src={previewUrls[zoomedIndex]} 
-                      alt={`Bobblehead option ${zoomedIndex + 1} (zoomed)`} 
-                      className="w-full rounded-lg pointer-events-none select-none" 
-                      draggable={false}
-                    />
-                    {/* Watermark overlay */}
-                    <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
-                      <div className="rotate-[-35deg] opacity-20">
-                        <p className="text-4xl font-black text-black tracking-widest">PREVIEW</p>
-                        <p className="text-xl font-bold text-black tracking-wider text-center">NOT FOR DOWNLOAD</p>
+
+                  {/* Carousel image + side arrows */}
+                  <div className="relative w-full max-w-lg flex items-center gap-3">
+                    {/* Prev arrow */}
+                    <button
+                      onClick={() => setZoomedIndex((zoomedIndex - 1 + previewUrls.length) % previewUrls.length)}
+                      disabled={previewUrls.length <= 1}
+                      className="flex-shrink-0 h-11 w-11 rounded-full border-2 border-primary/30 bg-white/90 dark:bg-zinc-900/90 shadow-lg flex items-center justify-center hover:border-primary hover:bg-primary hover:text-white transition-all duration-200 disabled:opacity-30 disabled:pointer-events-none"
+                      aria-label="Previous preview"
+                    >
+                      <ChevronLeft className="h-5 w-5" />
+                    </button>
+
+                    {/* Image card */}
+                    <div className="relative flex-1 rounded-xl overflow-hidden shadow-2xl border-2 border-primary/20 bg-white dark:bg-zinc-900 p-2">
+                      {/* eslint-disable-next-line @next/next/no-img-element */}
+                      <img
+                        key={zoomedIndex}
+                        src={previewUrls[zoomedIndex]}
+                        alt={`Bobblehead option ${zoomedIndex + 1} (zoomed)`}
+                        className="w-full rounded-lg pointer-events-none select-none animate-in fade-in duration-300"
+                        draggable={false}
+                      />
+                      {/* Watermark */}
+                      <div className="absolute inset-0 flex items-center justify-center pointer-events-none select-none">
+                        <div className="rotate-[-35deg] opacity-20">
+                          <p className="text-4xl font-black text-black tracking-widest">PREVIEW</p>
+                          <p className="text-xl font-bold text-black tracking-wider text-center">NOT FOR DOWNLOAD</p>
+                        </div>
                       </div>
                     </div>
+
+                    {/* Next arrow */}
+                    <button
+                      onClick={() => setZoomedIndex((zoomedIndex + 1) % previewUrls.length)}
+                      disabled={previewUrls.length <= 1}
+                      className="flex-shrink-0 h-11 w-11 rounded-full border-2 border-primary/30 bg-white/90 dark:bg-zinc-900/90 shadow-lg flex items-center justify-center hover:border-primary hover:bg-primary hover:text-white transition-all duration-200 disabled:opacity-30 disabled:pointer-events-none"
+                      aria-label="Next preview"
+                    >
+                      <ChevronRight className="h-5 w-5" />
+                    </button>
                   </div>
-                  
+
+                  {/* Dot indicators */}
+                  <div className="flex gap-2 mt-4">
+                    {previewUrls.map((_, i) => (
+                      <button
+                        key={i}
+                        onClick={() => setZoomedIndex(i)}
+                        className={`h-2 rounded-full transition-all duration-300 ${
+                          i === zoomedIndex
+                            ? "w-6 bg-primary"
+                            : "w-2 bg-muted-foreground/30 hover:bg-muted-foreground/60"
+                        }`}
+                        aria-label={`Go to preview ${i + 1}`}
+                      />
+                    ))}
+                  </div>
+
+                  {/* Action buttons */}
                   <div className="flex gap-3 mt-6">
                     <button
                       onClick={() => setZoomedIndex(null)}
-                      className="px-5 h-11 inline-flex items-center justify-center rounded-full border font-medium hover:bg-muted transition-all duration-200 gap-2"
+                      className="px-5 h-11 inline-flex items-center justify-center rounded-full border font-medium hover:bg-muted transition-all duration-200 gap-2 text-sm"
                     >
-                      <ChevronLeft className="h-4 w-4" />
-                      View Others
+                      ☰ View Grid
                     </button>
                     <button
-                      onClick={() => { setZoomedIndex(null); handleSelect(zoomedIndex); }}
-                      className="px-6 h-11 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-medium hover:from-purple-700 hover:to-pink-600 transition-all duration-200 hover:scale-105 shadow-lg gap-2"
+                      onClick={() => { handleSelect(zoomedIndex); }}
+                      className="px-6 h-11 inline-flex items-center justify-center rounded-full bg-gradient-to-r from-purple-600 to-pink-500 text-white font-semibold hover:from-purple-700 hover:to-pink-600 transition-all duration-200 hover:scale-105 shadow-lg gap-2 text-sm"
                     >
-                      ✅ Select This One
+                      ✅ Choose #{zoomedIndex + 1}
                     </button>
                   </div>
                 </>
@@ -450,8 +499,12 @@ export default function SuccessContent() {
                   </div>
                 )}
               </div>
+
+              {/* Video Upsell Offer */}
+              {orderId && <UpsellOffer orderId={orderId} />}
             </div>
           )}
+
 
           {status === "error" && (
             <div className="flex flex-col items-center animate-in fade-in duration-300">

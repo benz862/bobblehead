@@ -1,5 +1,13 @@
 import { NextResponse } from "next/server";
-import { supabase } from "@/lib/supabase";
+import OpenAI from "openai";
+import { createClient } from "@supabase/supabase-js";
+
+// Server-side routes must use the service-role key to bypass RLS.
+// The anon key (used in lib/supabase.ts) cannot read order rows when RLS is enabled.
+const supabase = createClient(
+  process.env.NEXT_PUBLIC_SUPABASE_URL!,
+  process.env.SUPABASE_SERVICE_ROLE_KEY || process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!
+);
 
 export async function POST(req: Request) {
   try {
@@ -16,8 +24,23 @@ export async function POST(req: Request) {
       .eq('id', orderId)
       .single();
 
-    if (orderError || !order) {
-      throw new Error("Order not found or database error");
+    if (orderError) {
+      // PGRST116 = "no rows returned" — the order simply doesn't exist yet
+      // Any other code = a real DB / network error
+      const isNotFound = orderError.code === 'PGRST116';
+      console.error(
+        `[Generate] Order lookup failed for orderId="${orderId}" — code=${orderError.code} hint=${orderError.hint} msg=${orderError.message}`
+      );
+      if (isNotFound) {
+        return NextResponse.json(
+          { error: `Order "${orderId}" not found. It may not have been created yet — please try again in a moment.` },
+          { status: 404 }
+        );
+      }
+      throw new Error(`Database error while fetching order: ${orderError.message}`);
+    }
+    if (!order) {
+      return NextResponse.json({ error: "Order not found." }, { status: 404 });
     }
 
     // Credit check: ensure order has remaining credits
@@ -176,7 +199,8 @@ IMPORTANT: Output your response in FOUR parts:
 
     // 4. Prepare Mega Prompt for Nano Banana Pro (Gemini / Imagen 4.0)
     const details = config.theme_details || {};
-    
+    const freeformDetails: string = details.freeformDetails?.trim() || '';
+
     // Build theme-specific prop, outfit, and orientation descriptions
     let propsDescription = '';
     let outfitDescription = '';
@@ -272,126 +296,143 @@ IMPORTANT: Output your response in FOUR parts:
       const costumeStr = costume ? `The animal is wearing ${costume}.` : 'The animal is in its natural appearance.';
       const animalLabel = breed ? `${breed} ${animalType}` : animalType;
 
-      prompt = `Product photography on a PURE WHITE (#FFFFFF) background. A bobblehead toy figurine of an adorable ${animalLabel} standing upright on its hind legs on a glossy display base with a silver nameplate.
+      prompt = `Professional product photography on a PURE WHITE (#FFFFFF) background. A premium hand-crafted bobblehead figurine — the style of high-end collectibles made by FOCO or Forever Collectibles. This is a REAL 3D SCULPTED OBJECT, not a cartoon or illustration.
+
+CRITICAL RENDERING STYLE — BODY MATERIAL AND FINISH:
+The body (everything below the neck) is a hand-painted polyresin figurine. It must look like:
+- Sculpted resin with natural, organic surface depth — NOT shiny hard plastic
+- Clothing and costume elements have FABRIC TEXTURE: visible wrinkles, cloth folds, material creases
+- The outfit looks like actual fabric or leather sculpted in 3D resin — you can see the weave, folds, and texture of the material
+- Matte to semi-matte painted finish — subtle sheen, not high-gloss
+- Soft directional studio lighting that reveals the sculpted form and fabric texture
+- Hand-painted colour details with natural variation, NOT flat or uniform
+- NO cartoon outlines, NO ink lines, NO 2D illustration style
+- The figurine looks like a premium collectible you could hold in your hand
 
 DISPLAY BASE (MUST BE VISIBLE IN IMAGE):
-At the bottom of the image there is a rectangular glossy display base/pedestal. The figure stands on top of this base. On the front of the base is an engraved silver nameplate that says "${nameplateText}". The base and nameplate MUST be clearly visible.
+At the bottom of the image there is a display base/pedestal. The figure stands on top of this base. The front of the base has an engraved nameplate that says "${nameplateText}".
 
 COSTUME/ACCESSORIES:
 ${propsDescription}. ${costumeStr}
-The animal is standing upright on hind legs in a cute, anthropomorphic pose.
+The animal is standing upright on hind legs in a cute, anthropomorphic pose. All costume elements are sculpted with fabric texture and hand-painted.
 
-HEAD AND FACE (PHOTOREALISTIC):
-The animal's head and face should look much more realistic than the body — like a high-quality photograph of a real ${animalLabel}. Real fur texture with individual strands${hairColor ? `, fur color ${hairColor}` : ''}. Realistic eyes with wet reflections and depth. Real nose texture. The head should contrast with the glossy plastic toy body.
+HEAD AND FACE (PHOTOREALISTIC — CONTRASTS WITH SCULPTED BODY):
+The animal's head and face should look much more realistic than the body — like a high-quality photograph of a real ${animalLabel}. Real fur texture with individual strands${hairColor ? `, fur color ${hairColor}` : ''}. Realistic eyes with wet reflections and depth. The photorealistic head sits in contrast to the sculpted resin toy body below it.
 
 ANIMAL APPEARANCE (MATCH THIS):
 ${petDescription.replace(/\n/g, ' ')}${colorEmphasis}
 
 BODY AND PROPORTIONS:
-- Classic bobblehead proportions: MASSIVE oversized head, tiny cartoonish body
-- The body (below the neck) is glossy painted plastic toy style
+- Classic bobblehead proportions: MASSIVE oversized photorealistic head, smaller sculpted resin body
 - Full figure from head to feet including display base, nothing cropped
 - No metal support rods or sticks
-- Solid pure white (#FFFFFF) background, no scenery`;
+- Solid pure white (#FFFFFF) background, soft studio lighting${freeformDetails ? `
+
+CUSTOM USER REQUESTS (HIGHEST PRIORITY — APPLY ALL OF THESE EXACTLY):
+${freeformDetails}
+These are direct instructions from the customer and override any defaults above.` : ''}`;
     } else {
       // === HUMAN BOBBLEHEAD PROMPT ===
-      prompt = `Product photography on a PURE WHITE (#FFFFFF) background. A bobblehead toy figurine standing on a glossy display base with a silver nameplate.
+      prompt = `Professional product photography on a PURE WHITE (#FFFFFF) background. A premium hand-crafted bobblehead figurine — the style of high-end licensed collectibles (like FOCO, Forever Collectibles, or official team bobbleheads). This is a REAL 3D SCULPTED OBJECT photographed in a studio.
+
+CRITICAL RENDERING STYLE — BODY MATERIAL AND FINISH:
+The body (everything below the neck) is a hand-painted polyresin figurine. It must look EXACTLY like the reference-quality bobbleheads sold at stadium gift shops:
+- Sculpted resin with natural organic surface depth and dimension
+- CLOTHING HAS REAL FABRIC TEXTURE: visible cloth wrinkles, jersey creases, material folds, stitching detail
+- The uniform/outfit looks like actual fabric or leather that has been sculpted in 3D — you can see the material weave and natural folds
+- Matte to semi-matte hand-painted finish — subtle natural sheen, NOT high-gloss or shiny plastic
+- Soft studio lighting reveals sculpted form and fabric/material texture
+- Hand-painted colour with natural tonal variation and depth, NOT flat or airbrushed
+- NO cartoon outlines, NO ink lines, NO 2D illustration style
+- The figurine looks like a premium $80 licensed collectible bobblehead
 
 DISPLAY BASE (MUST BE VISIBLE IN IMAGE):
-At the bottom of the image there is a rectangular glossy display base/pedestal. The figure's feet are planted on top of this base. On the front of the base is an engraved silver nameplate that says "${nameplateText}". Do NOT put the team name on the nameplate. The base and nameplate MUST be clearly visible.
+A display base/pedestal at the bottom. The figure's feet are planted on top of it. The front of the base has an engraved nameplate that says "${nameplateText}". Do NOT put the team name on the nameplate.
 
-OUTFIT AND PROPS (MANDATORY):
+OUTFIT AND PROPS (SCULPTED WITH FABRIC TEXTURE):
 The figure is ${propsDescription}. ${outfitDescription}
-Do NOT substitute with a business suit, casual clothes, or any other outfit. The figure has an energetic pose while feet stay on the base.
+Do NOT substitute with any other outfit. The figure has an energetic dynamic pose. All clothing has REAL fabric texture — wrinkles, folds, material depth. All props are sculpted 3D resin.
 
 HEAD AND FACE (PHOTOREALISTIC — LIKENESS IS THE #1 PRIORITY):
-The head and face should look much more realistic than the body — like a high-quality portrait photograph of a SPECIFIC REAL PERSON. The face must be INSTANTLY RECOGNIZABLE as the person described below. Real skin texture with visible pores and natural tonal variation. Real hair with individual strands, shine, and movement${hairColor ? ` — hair color is ${hairColor}` : ''}.${facialHair ? ` IMPORTANT: This person has ${facialHair}. The facial hair MUST be visible on the figurine. Do NOT omit the facial hair.` : ''} Realistic eyes with wet reflections, iris detail, and depth. The head should contrast with the glossy plastic toy body.
+The head and face should look dramatically more realistic than the sculpted resin body — like a high-quality portrait photograph of a SPECIFIC REAL PERSON. The face must be INSTANTLY RECOGNIZABLE. Real skin texture with visible pores and natural tonal variation. Real hair with individual strands, shine, and movement${hairColor ? ` — hair color is ${hairColor}` : ''}.${facialHair ? ` IMPORTANT: This person has ${facialHair}. The facial hair MUST be visible. Do NOT omit it.` : ''} Realistic eyes with wet reflections, iris detail, and depth.
 
-FACE IDENTITY (MATCH THIS PERSON EXACTLY — THIS IS THE MOST IMPORTANT SECTION):
+FACE IDENTITY (MATCH THIS PERSON EXACTLY — MOST IMPORTANT SECTION):
 ${faceDescription.replace(/\n/g, ' ')}${colorEmphasis}${identityReinforcement}
 
 BODY AND PROPORTIONS:
-- Classic bobblehead proportions: MASSIVE oversized head, tiny cartoonish body
-- The body (below the neck) is glossy painted plastic toy style
-- REMINDER: Must be wearing the ${config.theme_type === 'sport' ? (details.sport || 'sports') + ' uniform' : (details.occupation || 'occupation') + ' outfit'} described above
-- Full figure from head to feet including display base, nothing cropped
-- No metal support rods or sticks
-- Solid pure white (#FFFFFF) background, no scenery`;
+- Classic bobblehead proportions: MASSIVE oversized photorealistic head, smaller sculpted resin body
+- REMINDER: Wearing the ${config.theme_type === 'sport' ? (details.sport || 'sports') + ' uniform' : (details.occupation || 'occupation') + ' outfit'} above with FABRIC TEXTURE — wrinkles and material folds visible
+- Full figure visible from head to base, nothing cropped
+- No metal support rods, wires, or stands
+- Pure white (#FFFFFF) studio background, soft professional lighting${freeformDetails ? `
+
+CUSTOM USER REQUESTS (HIGHEST PRIORITY — APPLY ALL OF THESE EXACTLY):
+${freeformDetails}
+These are direct instructions from the customer and override any defaults above.` : ''}`;
     }
-    console.log(`[AI Engine] Initializing Nano Banana 2 (Gemini 3.1 Flash Image) for Order: ${orderId}...`);
+    console.log(`[AI Engine] Initializing gpt-image-1 (OpenAI Images API) for Order: ${orderId}...`);
     console.log(`[AI Engine] Prompt length: ${prompt.length} chars`);
-    
-    // 5. Generate 4 previews using Nano Banana 2 (gemini-3.1-flash-image-preview)
-    // Supports up to 14 reference images, 4K resolution, and improved face likeness
-    const geminiImageUrl = `https://generativelanguage.googleapis.com/v1beta/models/gemini-3.1-flash-image-preview:generateContent`;
-    
-    // Build the content parts: text prompt + reference photo
-    const contentParts: any[] = [
-      { text: prompt + "\n\nIMPORTANT: The reference photo below shows the EXACT person whose face must appear on this bobblehead. Match their facial features, skin tone, hair, and any distinctive characteristics as closely as possible. The face on the bobblehead must be INSTANTLY RECOGNIZABLE as this specific person." }
-    ];
-    
-    // Add the reference photo(s) as inline data so the model can SEE the face
+
+    const openai = new OpenAI({ apiKey: process.env.OPENAI_API_KEY });
+
+    // 5. Generate 4 previews using gpt-image-1
+    // Accepts reference images as input for improved face likeness
+    const fullPrompt = prompt + "\n\nIMPORTANT: The reference photo below shows the EXACT person whose face must appear on this bobblehead. Match their facial features, skin tone, hair, and any distinctive characteristics as closely as possible. The face on the bobblehead must be INSTANTLY RECOGNIZABLE as this specific person.";
+
+    // Pre-fetch reference photos as File objects for the API
+    const referenceFiles: File[] = [];
     if (uploads && uploads.length > 0) {
       for (const upload of uploads) {
         try {
           const imgRes = await fetch(upload.image_url);
           const imgBuffer = await imgRes.arrayBuffer();
-          const base64Img = Buffer.from(imgBuffer).toString('base64');
-          contentParts.push({
-            inlineData: { mimeType: "image/jpeg", data: base64Img }
-          });
+          const blob = new Blob([imgBuffer], { type: 'image/jpeg' });
+          referenceFiles.push(new File([blob], `ref-${upload.id}.jpg`, { type: 'image/jpeg' }));
         } catch (e) {
           console.log(`[AI Engine] Could not fetch upload ${upload.id}, skipping`);
         }
       }
     }
-    
-    // Fire 4 parallel requests (Nano Banana 2 generates 1 image per call)
+
+    // Fire 4 parallel requests (gpt-image-1 generates 1 image per call)
     const generateOne = async (index: number): Promise<string | null> => {
       try {
-        const res = await fetch(geminiImageUrl, {
-          method: 'POST',
-          headers: { 
-            'Content-Type': 'application/json',
-            'x-goog-api-key': GEMINI_API_KEY!,
-          },
-          body: JSON.stringify({
-            contents: [{ parts: contentParts }],
-            generationConfig: {
-              responseModalities: ["TEXT", "IMAGE"],
-              temperature: 1.0,  // Add variation between the 4 results
-              imageConfig: {
-                aspectRatio: "3:4",
-                imageSize: "2K",
-              },
-            }
-          })
-        });
-        
-        if (!res.ok) {
-          const errText = await res.text();
-          console.error(`[AI Engine] Preview ${index} failed (${res.status}):`, errText);
+        // If we have reference images, use the edit endpoint (supports input images)
+        // Otherwise fall back to generate
+        let b64: string | null = null;
+
+        if (referenceFiles.length > 0) {
+          const editRes = await openai.images.edit({
+            model: "gpt-image-1",
+            image: referenceFiles[0], // Primary reference photo
+            prompt: fullPrompt,
+            size: "1024x1536",  // Portrait: fits bobblehead (tall)
+            quality: "high",
+          } as any);
+          b64 = editRes.data?.[0]?.b64_json ?? null;
+        } else {
+          const genRes = await openai.images.generate({
+            model: "gpt-image-1",
+            prompt: fullPrompt,
+            size: "1024x1536",
+            quality: "high",
+            n: 1,
+          } as any);
+          b64 = genRes.data?.[0]?.b64_json ?? null;
+        }
+
+        if (!b64) {
+          console.log(`[AI Engine] Preview ${index}: no image in response`);
           return null;
         }
-        
-        const data = await res.json();
-        // Extract image from response parts
-        if (data.candidates && data.candidates[0]?.content?.parts) {
-          for (const part of data.candidates[0].content.parts) {
-            if (part.inlineData && part.inlineData.mimeType?.startsWith('image/')) {
-              return part.inlineData.data; // base64 image
-            }
-          }
-        }
-        console.log(`[AI Engine] Preview ${index}: no image in response`);
-        return null;
-      } catch (e) {
-        console.error(`[AI Engine] Preview ${index} error:`, e);
+        return b64;
+      } catch (e: any) {
+        console.error(`[AI Engine] Preview ${index} error:`, e?.message ?? e);
         return null;
       }
     };
     
-    console.log(`[AI Engine] Firing 4 parallel image generation requests...`);
+    console.log(`[AI Engine] Firing 4 parallel gpt-image-1 requests...`);
     const results = await Promise.all([
       generateOne(0),
       generateOne(1),
@@ -400,7 +441,7 @@ BODY AND PROPORTIONS:
     ]);
     
     let predictions = results.filter((r): r is string => r !== null);
-    console.log(`[AI Engine] Nano Banana 2: Got ${predictions.length}/4 successful generations`);
+    console.log(`[AI Engine] gpt-image-1: Got ${predictions.length}/4 successful generations`);
     
     // Retry if we got fewer than 2
     const MAX_RETRIES = 3;
@@ -421,7 +462,7 @@ BODY AND PROPORTIONS:
       throw new Error(`Only ${predictions.length} preview(s) could be generated. The AI safety filter may be blocking this image. Please try a different photo.`);
     }
 
-    console.log(`[AI Engine] Nano Banana 2: Final count: ${predictions.length} preview images!`);
+    console.log(`[AI Engine] gpt-image-1: Final count: ${predictions.length} preview images!`);
     
     // 6. Upload all previews to Supabase Storage
     const previewUrls: string[] = [];
