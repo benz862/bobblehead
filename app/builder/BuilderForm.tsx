@@ -33,16 +33,27 @@ export function BuilderForm() {
 
   useEffect(() => {
     if (!existingOrderId) return;
+    let cancelled = false;
     (async () => {
-      const { data: order } = await supabase.from('orders').select('credits_total, credits_used, tier').eq('id', existingOrderId).single();
-      if (order) {
-        setCreditInfo({ total: order.credits_total, used: order.credits_used });
+      const res = await fetch(
+        `/api/orders/${encodeURIComponent(existingOrderId)}/reuse-state`
+      );
+      if (!res.ok || cancelled) return;
+      const data = await res.json();
+      if (cancelled) return;
+      if (data?.order) {
+        setCreditInfo({
+          total: data.order.credits_total,
+          used: data.order.credits_used,
+        });
       }
-      const { data: uploads } = await supabase.from('uploads').select('image_url').eq('order_id', existingOrderId);
-      if (uploads && uploads.length > 0) {
-        setExistingUploads(uploads.map((u: any) => u.image_url));
+      if (Array.isArray(data?.uploads) && data.uploads.length > 0) {
+        setExistingUploads(data.uploads);
       }
     })();
+    return () => {
+      cancelled = true;
+    };
   }, [existingOrderId]);
   
   // Sport state
@@ -235,13 +246,16 @@ export function BuilderForm() {
         return;
       }
       
-      const { data: order, error } = await supabase
-        .from('orders')
-        .insert([{ tier, amount: price, status: 'pending', credits_total: tier, credits_used: 0 }])
-        .select()
-        .single();
-        
-      if (error) throw error;
+      const createOrderRes = await fetch("/api/orders/create", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ tier }),
+      });
+      const createOrderData = await createOrderRes.json();
+      if (!createOrderRes.ok || !createOrderData?.order) {
+        throw new Error(createOrderData?.error || "Failed to create order.");
+      }
+      const order = createOrderData.order;
 
       const uploadedUrls = [];
       for (let i = 0; i < images.length; i++) {
